@@ -1,0 +1,38 @@
+# Simulated books waiting at the intake station. List order matches the
+# spawn order of libbot_rfid_book_1..6 in libbot_gazebo/worlds/library.world
+# (purely for a human-readable correspondence -- the sorting node matches
+# books to their Gazebo prop by proximity via the RFID reader, not by
+# list index). Add more entries / more libbot_rfid_book_N props in the
+# world to grow the queue; target_shelf_id must be a key from shelf_map.yaml
+# (or left blank to resolve via genre against the first matching shelf).
+books:
+  - tag_id: "BOOK-000001"
+    gazebo_model: "libbot_rfid_book_1"
+    title: "The Last Aisle"
+    genre: "fiction"
+    target_shelf_id: "FICTION-A1"
+  - tag_id: "BOOK-000002"
+    gazebo_model: "libbot_rfid_book_2"
+    title: "Nebula Drift"
+    genre: "scifi"
+    target_shelf_id: "SCIFI-B1"
+  - tag_id: "BOOK-000003"
+    gazebo_model: "libbot_rfid_book_3"
+    title: "The Quiet Alibi"
+    genre: "mystery"
+    target_shelf_id: "MYSTERY-C1"
+  - tag_id: "BOOK-000004"
+    gazebo_model: "libbot_rfid_book_4"
+    title: "A Life in Footnotes"
+    genre: "biography"
+    target_shelf_id: "BIOGRAPHY-D1"
+  - tag_id: "BOOK-000005"
+    gazebo_model: "libbot_rfid_book_5"
+    title: "Empires of Ash"
+    genre: "history"
+    target_shelf_id: "HISTORY-E1"
+  - tag_id: "BOOK-000006"
+    gazebo_model: "libbot_rfid_book_6"
+    title: "The Paper Garden"
+    genre: "children"
+    target_shelf_id: "CHILDREN-F1"

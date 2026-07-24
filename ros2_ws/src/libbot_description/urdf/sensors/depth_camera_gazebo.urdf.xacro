@@ -1,0 +1,42 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Attaches a Gazebo RGB-D sensor to the realsense2_description D435i
+       model (link names come from that package's sensor_d435i macro
+       with name="camera"). Publishes color + depth + a registered
+       PointCloud2 used by libbot_perception's shelf-slot inference node. -->
+
+  <xacro:macro name="libbot_depth_camera_gazebo" params="camera_name:=camera hz:=15 width:=640 height:=480 hfov:=1.211259 min_range:=0.28 max_range:=6.0">
+    <gazebo reference="${camera_name}_depth_frame">
+      <sensor name="${camera_name}_depth_sensor" type="depth">
+        <always_on>true</always_on>
+        <update_rate>${hz}</update_rate>
+        <visualize>false</visualize>
+        <camera name="${camera_name}">
+          <horizontal_fov>${hfov}</horizontal_fov>
+          <image>
+            <width>${width}</width>
+            <height>${height}</height>
+            <format>R8G8B8</format>
+          </image>
+          <clip>
+            <near>${min_range}</near>
+            <far>${max_range}</far>
+          </clip>
+        </camera>
+        <plugin name="${camera_name}_depth_plugin" filename="libgazebo_ros_camera.so">
+          <ros>
+            <namespace>/libbot/${camera_name}</namespace>
+          </ros>
+          <camera_name>${camera_name}</camera_name>
+          <frame_name>${camera_name}_depth_optical_frame</frame_name>
+          <min_depth>${min_range}</min_depth>
+          <max_depth>${max_range}</max_depth>
+          <point_cloud_cutoff>${min_range}</point_cloud_cutoff>
+          <point_cloud_cutoff_max>${max_range}</point_cloud_cutoff_max>
+        </plugin>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+</robot>

@@ -1,0 +1,9 @@
+<library path="libbot_rviz_plugins">
+  <class name="libbot_rviz_plugins/LibbotControlPanel"
+         type="libbot_rviz_plugins::LibbotControlPanel"
+         base_class_type="rviz_common::Panel">
+    <description>
+      libraryBot robot controls: manual drive, e-stop, sorting, mode switching.
+    </description>
+  </class>
+</library>

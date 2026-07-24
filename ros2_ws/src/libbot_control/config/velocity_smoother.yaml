@@ -1,0 +1,17 @@
+# Optional: smooths Nav2's raw cmd_vel before it reaches the mecanum
+# controller. Not wired into bringup by default (Nav2's DWB output is
+# already reasonably smooth for this holonomic base) but available via
+# libbot_navigation/launch/navigation.launch.py use_velocity_smoother:=true
+velocity_smoother:
+  ros__parameters:
+    smoothing_frequency: 20.0
+    scale_velocities: false
+    feedback: "OPEN_LOOP"
+    max_velocity: [0.8, 0.5, 1.5]     # vx, vy, wz -- holonomic: y is nonzero
+    min_velocity: [-0.8, -0.5, -1.5]
+    max_accel: [1.5, 1.0, 2.5]
+    max_decel: [-1.5, -1.0, -2.5]
+    odom_topic: "/libbot/mecanum_drive_controller/odometry"
+    odom_duration: 0.1
+    deadband_velocity: [0.0, 0.0, 0.0]
+    velocity_timeout: 1.0

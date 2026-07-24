@@ -1,0 +1,291 @@
+# Nav2 stack tuned for libbot: a holonomic (omni/mecanum) base navigating
+# a library floor plan with narrow ~1-1.2m aisles. AMCL and map_server are
+# NOT here -- they're launched/managed separately by
+# libbot_localization/launch/localization.launch.py (use_amcl:=true), which
+# keeps localization independently restartable from the planning/control
+# layer. This file's lifecycle_manager only manages the nodes below.
+
+/**:
+  bt_navigator:
+    ros__parameters:
+      use_sim_time: True
+      global_frame: map
+      robot_base_frame: base_footprint
+      odom_topic: /odometry/filtered
+      bt_loop_duration: 10
+      default_server_timeout: 20
+      wait_for_service_timeout: 1000
+      default_nav_to_pose_bt_xml: /opt/ros/humble/share/nav2_bt_navigator/behavior_trees/navigate_to_pose_w_replanning_and_recovery.xml
+      plugin_lib_names:
+        - nav2_compute_path_to_pose_action_bt_node
+        - nav2_compute_path_through_poses_action_bt_node
+        - nav2_smooth_path_action_bt_node
+        - nav2_follow_path_action_bt_node
+        - nav2_spin_action_bt_node
+        - nav2_wait_action_bt_node
+        - nav2_assisted_teleop_action_bt_node
+        - nav2_back_up_action_bt_node
+        - nav2_drive_on_heading_bt_node
+        - nav2_clear_costmap_service_bt_node
+        - nav2_is_stuck_condition_bt_node
+        - nav2_goal_reached_condition_bt_node
+        - nav2_goal_updated_condition_bt_node
+        - nav2_globally_updated_goal_condition_bt_node
+        - nav2_is_path_valid_condition_bt_node
+        - nav2_initial_pose_received_condition_bt_node
+        - nav2_reinitialize_global_localization_service_bt_node
+        - nav2_rate_controller_bt_node
+        - nav2_distance_controller_bt_node
+        - nav2_speed_controller_bt_node
+        - nav2_truncate_path_action_bt_node
+        - nav2_truncate_path_local_action_bt_node
+        - nav2_goal_updater_node_bt_node
+        - nav2_recovery_node_bt_node
+        - nav2_pipeline_sequence_bt_node
+        - nav2_round_robin_node_bt_node
+        - nav2_transform_available_condition_bt_node
+        - nav2_time_expired_condition_bt_node
+        - nav2_path_expiring_timer_condition
+        - nav2_distance_traveled_condition_bt_node
+        - nav2_single_trigger_bt_node
+        - nav2_goal_updated_controller_bt_node
+        - nav2_is_battery_low_condition_bt_node
+        - nav2_navigate_through_poses_action_bt_node
+        - nav2_navigate_to_pose_action_bt_node
+        - nav2_remove_passed_goals_action_bt_node
+        - nav2_planner_selector_bt_node
+        - nav2_controller_selector_bt_node
+        - nav2_goal_checker_selector_bt_node
+        - nav2_controller_cancel_bt_node
+        - nav2_path_longer_on_approach_bt_node
+        - nav2_wait_cancel_bt_node
+        - nav2_spin_cancel_bt_node
+        - nav2_back_up_cancel_bt_node
+        - nav2_assisted_teleop_cancel_bt_node
+        - nav2_drive_on_heading_cancel_bt_node
+        - nav2_is_battery_charging_condition_bt_node
+
+  bt_navigator_navigate_through_poses_rclcpp_node:
+    ros__parameters:
+      use_sim_time: True
+
+  bt_navigator_navigate_to_pose_rclcpp_node:
+    ros__parameters:
+      use_sim_time: True
+
+  controller_server:
+    ros__parameters:
+      use_sim_time: True
+      controller_frequency: 20.0
+      min_x_velocity_threshold: 0.001
+      min_y_velocity_threshold: 0.001
+      min_theta_velocity_threshold: 0.001
+      progress_checker_plugin: "progress_checker"
+      goal_checker_plugins: ["goal_checker"]
+      controller_plugins: ["FollowPath"]
+
+      # required_movement_radius/movement_time_allowance and
+      # yaw_goal_tolerance are relaxed versus nav2's stock defaults: the
+      # planar_move-driven holonomic base tracks small/slow commanded
+      # velocities (yaw rate especially) less crisply than a real robot
+      # would, closer to a static-friction breakaway effect than a clean
+      # linear response (see README "Drivetrain design note"). These
+      # margins keep Nav2 from declaring "failed to make progress" on a
+      # robot that is, in fact, still making progress, just slowly.
+      progress_checker:
+        plugin: "nav2_controller::SimpleProgressChecker"
+        required_movement_radius: 0.2
+        movement_time_allowance: 25.0
+      goal_checker:
+        plugin: "nav2_controller::SimpleGoalChecker"
+        xy_goal_tolerance: 0.3
+        yaw_goal_tolerance: 0.4
+        stateful: True
+
+      # DWB configured holonomic: nonzero vy limits/samples let the planner
+      # actually use the mecanum base's ability to strafe, e.g. to square up
+      # to a shelf without a three-point turn in a narrow aisle.
+      #
+      # Velocity/accel limits here are set BELOW what the base can command
+      # in principle, to roughly match what it actually achieves (see
+      # README "Drivetrain design note"): commanding speeds the base can't
+      # really hit just makes DWB overshoot and oscillate against a
+      # nonlinear plant. Retune upward if you improve the drivetrain.
+      FollowPath:
+        plugin: "dwb_core::DWBLocalPlanner"
+        debug_trajectory_details: True
+        min_vel_x: -0.3
+        min_vel_y: -0.25
+        max_vel_x: 0.3
+        max_vel_y: 0.25
+        max_vel_theta: 0.6
+        min_speed_xy: 0.0
+        max_speed_xy: 0.4
+        min_speed_theta: 0.0
+        acc_lim_x: 0.8
+        acc_lim_y: 0.6
+        acc_lim_theta: 1.2
+        decel_lim_x: -0.8
+        decel_lim_y: -0.6
+        decel_lim_theta: -1.2
+        vx_samples: 15
+        vy_samples: 10
+        vtheta_samples: 20
+        sim_time: 2.0
+        linear_granularity: 0.05
+        angular_granularity: 0.025
+        transform_tolerance: 0.3
+        trans_stopped_velocity: 0.1
+        short_circuit_trajectory_evaluation: True
+        stateful: True
+        critics: ["RotateToGoal", "Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+        BaseObstacle.scale: 0.02
+        PathAlign.scale: 24.0
+        GoalAlign.scale: 20.0
+        PathDist.scale: 32.0
+        GoalDist.scale: 24.0
+        # Low scale: a holonomic base doesn't need to face its direction
+        # of travel, so RotateToGoal only needs to nudge final heading
+        # alignment near the goal, not dominate the trajectory search.
+        RotateToGoal.scale: 1.5
+        RotateToGoal.slowing_factor: 5.0
+        RotateToGoal.lookahead_time: -1.0
+
+  local_costmap:
+    local_costmap:
+      ros__parameters:
+        use_sim_time: True
+        global_frame: odom
+        robot_base_frame: base_footprint
+        rolling_window: true
+        width: 4
+        height: 4
+        resolution: 0.05
+        robot_radius: 0.33
+        plugins: ["obstacle_layer", "inflation_layer"]
+        inflation_layer:
+          plugin: "nav2_costmap_2d::InflationLayer"
+          cost_scaling_factor: 5.0
+          inflation_radius: 0.35
+        obstacle_layer:
+          plugin: "nav2_costmap_2d::ObstacleLayer"
+          enabled: True
+          # Two independent obstacle sources: the height-banded 2D lidar
+          # scan (long range, 360deg, but only "sees" what falls in its
+          # ~0.05-1.0m vertical band) and the D435i's raw depth point
+          # cloud (short range, ~69deg forward FOV, but genuinely 3D so
+          # it can catch things the lidar's band misses or mismeasures
+          # close up, e.g. a chair pushed in partway or a low stool).
+          # Each source marks/clears the local costmap independently, so
+          # an obstacle only one sensor sees still gets avoided -- this
+          # is the lidar/depth-camera fusion for local obstacle
+          # avoidance; IMU fusion (for a stable base_footprint pose to
+          # actually place these detections correctly) happens upstream
+          # in robot_localization (libbot_localization/config/ekf.yaml),
+          # not here.
+          observation_sources: scan depth_camera
+          scan:
+            topic: /scan
+            max_obstacle_height: 2.0
+            clearing: True
+            marking: True
+            data_type: "LaserScan"
+            raytrace_max_range: 5.0
+            raytrace_min_range: 0.0
+            obstacle_max_range: 4.0
+            obstacle_min_range: 0.0
+          depth_camera:
+            topic: /libbot/camera/camera/points
+            # Same physical band as the lidar's flattened scan (see
+            # libbot_perception/config/pointcloud_to_laserscan.yaml) so
+            # the two sources agree on what counts as an obstacle.
+            min_obstacle_height: 0.05
+            max_obstacle_height: 0.90
+            clearing: True
+            marking: True
+            data_type: "PointCloud2"
+            raytrace_max_range: 3.0
+            raytrace_min_range: 0.0
+            obstacle_max_range: 2.5
+            obstacle_min_range: 0.28
+        always_send_full_costmap: True
+
+  global_costmap:
+    global_costmap:
+      ros__parameters:
+        use_sim_time: True
+        robot_base_frame: base_footprint
+        robot_radius: 0.33
+        resolution: 0.05
+        track_unknown_space: True
+        plugins: ["static_layer", "obstacle_layer", "inflation_layer"]
+        obstacle_layer:
+          plugin: "nav2_costmap_2d::ObstacleLayer"
+          enabled: True
+          observation_sources: scan
+          scan:
+            topic: /scan
+            max_obstacle_height: 2.0
+            clearing: True
+            marking: True
+            data_type: "LaserScan"
+            raytrace_max_range: 5.0
+            raytrace_min_range: 0.0
+            obstacle_max_range: 4.0
+            obstacle_min_range: 0.0
+        static_layer:
+          plugin: "nav2_costmap_2d::StaticLayer"
+          map_subscribe_transient_local: True
+        inflation_layer:
+          plugin: "nav2_costmap_2d::InflationLayer"
+          cost_scaling_factor: 5.0
+          inflation_radius: 0.35
+        always_send_full_costmap: True
+
+  planner_server:
+    ros__parameters:
+      use_sim_time: True
+      planner_plugins: ["GridBased"]
+      GridBased:
+        plugin: "nav2_navfn_planner/NavfnPlanner"
+        tolerance: 0.4
+        use_astar: false
+        allow_unknown: true
+
+  smoother_server:
+    ros__parameters:
+      use_sim_time: True
+
+  behavior_server:
+    ros__parameters:
+      use_sim_time: True
+      costmap_topic: local_costmap/costmap_raw
+      footprint_topic: local_costmap/published_footprint
+      cycle_frequency: 10.0
+      behavior_plugins: ["spin", "backup", "drive_on_heading", "wait"]
+      spin:
+        plugin: "nav2_behaviors/Spin"
+      backup:
+        plugin: "nav2_behaviors/BackUp"
+      drive_on_heading:
+        plugin: "nav2_behaviors/DriveOnHeading"
+      wait:
+        plugin: "nav2_behaviors/Wait"
+      global_frame: odom
+      robot_base_frame: base_footprint
+      transform_tolerance: 0.3
+      simulate_ahead_time: 2.0
+      max_rotational_vel: 1.5
+      min_rotational_vel: 0.4
+      rotational_acc_lim: 2.5
+
+  waypoint_follower:
+    ros__parameters:
+      use_sim_time: True
+      loop_rate: 20
+      stop_on_failure: false
+      waypoint_task_executor_plugin: "wait_at_waypoint"
+      wait_at_waypoint:
+        plugin: "nav2_waypoint_follower::WaitAtWaypoint"
+        enabled: True
+        waypoint_pause_duration: 200

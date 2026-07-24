@@ -1,0 +1,191 @@
+# Maps human-friendly shelf_id -> Gazebo model + nav2 approach pose (map frame).
+# Regenerate against worlds/library.world if the world layout changes.
+# approach_pose is an automatically computed 0.9m standoff facing each shelf's
+# center; it has NOT been hand-verified against the aisle layout for every
+# shelf, so nudge an entry here if its real approach point turns out to be
+# too close to a desk/column/other shelf. shelf_pose is the shelf model's own
+# pose (useful for the depth-camera shelf-slot inference node).
+shelves:
+  FICTION-A1:
+    gazebo_model: "BookshelfA_01_001"
+    genre: "fiction"
+    approach_pose:
+      x: 0.779
+      y: -0.803
+      yaw: -0.801
+    shelf_pose:
+      x: 1.405
+      y: -1.45
+      yaw: 0.001
+  FICTION-A2:
+    gazebo_model: "BookshelfA_01_002"
+    genre: "fiction"
+    approach_pose:
+      x: 1.15
+      y: -3.898
+      yaw: -1.284
+    shelf_pose:
+      x: 1.405
+      y: -4.762
+      yaw: 0.0
+  SCIFI-B1:
+    gazebo_model: "BookshelfA_01_003"
+    genre: "scifi"
+    approach_pose:
+      x: -1.777
+      y: -1.035
+      yaw: -2.614
+    shelf_pose:
+      x: -2.554
+      y: -1.487
+      yaw: 0.032
+  SCIFI-B2:
+    gazebo_model: "BookshelfA_01_004"
+    genre: "scifi"
+    approach_pose:
+      x: -2.176
+      y: -3.972
+      yaw: -2.072
+    shelf_pose:
+      x: -2.609
+      y: -4.762
+      yaw: 0.0
+  MYSTERY-C1:
+    gazebo_model: "BookshelfB_01_001"
+    genre: "mystery"
+    approach_pose:
+      x: -5.583
+      y: -6.121
+      yaw: -2.31
+    shelf_pose:
+      x: -6.19
+      y: -6.786
+      yaw: -0.032
+  MYSTERY-C2:
+    gazebo_model: "BookshelfB_01_002"
+    genre: "mystery"
+    approach_pose:
+      x: -1.938
+      y: -6.114
+      yaw: -1.878
+    shelf_pose:
+      x: -2.209
+      y: -6.971
+      yaw: 0.0
+  BIOGRAPHY-D1:
+    gazebo_model: "BookshelfB_01_003"
+    genre: "biography"
+    approach_pose:
+      x: 0.455
+      y: -6.074
+      yaw: -1.496
+    shelf_pose:
+      x: 0.522
+      y: -6.971
+      yaw: 0.0
+  BIOGRAPHY-D2:
+    gazebo_model: "BookshelfB_01_004"
+    genre: "biography"
+    approach_pose:
+      x: 2.909
+      y: -6.15
+      yaw: -1.129
+    shelf_pose:
+      x: 3.293
+      y: -6.964
+      yaw: 0.0
+  HISTORY-E1:
+    gazebo_model: "BookshelfB_01_005"
+    genre: "history"
+    approach_pose:
+      x: 5.49
+      y: -6.309
+      yaw: -0.855
+    shelf_pose:
+      x: 6.08
+      y: -6.988
+      yaw: 0.0
+  HISTORY-E2:
+    gazebo_model: "BookshelfB_01_006"
+    genre: "history"
+    approach_pose:
+      x: 6.744
+      y: -4.778
+      yaw: -0.616
+    shelf_pose:
+      x: 7.478
+      y: -5.298
+      yaw: 1.554
+  CHILDREN-F1:
+    gazebo_model: "BookshelfB_01_007"
+    genre: "children"
+    approach_pose:
+      x: 6.625
+      y: -2.224
+      yaw: -0.324
+    shelf_pose:
+      x: 7.478
+      y: -2.511
+      yaw: 1.562
+  CHILDREN-F2:
+    gazebo_model: "BookshelfB_01_008"
+    genre: "children"
+    approach_pose:
+      x: 6.58
+      y: 0.354
+      yaw: 0.054
+    shelf_pose:
+      x: 7.478
+      y: 0.403
+      yaw: 1.571
+  REFERENCE-G1:
+    gazebo_model: "BookshelfC_01_001"
+    genre: "reference"
+    approach_pose:
+      x: 2.09
+      y: -0.941
+      yaw: -0.423
+    shelf_pose:
+      x: 2.911
+      y: -1.31
+      yaw: 0.001
+  REFERENCE-G2:
+    gazebo_model: "BookshelfC_01_002"
+    genre: "reference"
+    approach_pose:
+      x: 2.445
+      y: -3.994
+      yaw: -1.021
+    shelf_pose:
+      x: 2.915
+      y: -4.762
+      yaw: 0.0
+  POETRY-H1:
+    gazebo_model: "BookshelfC_01_003"
+    genre: "poetry"
+    approach_pose:
+      x: -3.653
+      y: -1.06
+      yaw: -2.859
+    shelf_pose:
+      x: -4.517
+      y: -1.31
+      yaw: 0.0
+  POETRY-H2:
+    gazebo_model: "BookshelfC_01_004"
+    genre: "poetry"
+    approach_pose:
+      x: -3.988
+      y: -4.115
+      yaw: -2.34
+    shelf_pose:
+      x: -4.614
+      y: -4.762
+      yaw: 0.0
+
+# Home / intake station: where new books arrive and where the robot returns
+# to await the next one. In front of InfoDesk_01_001 (see library.world).
+intake_station:
+  x: 1.0
+  y: 3.5
+  yaw: 1.5708

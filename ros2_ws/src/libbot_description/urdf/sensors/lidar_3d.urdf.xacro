@@ -1,0 +1,79 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Simulated 3D spinning lidar (16-channel, VLP-16 class) built from
+       a Gazebo "ray" sensor with vertical samples. CPU ray (not gpu_ray)
+       is used because Gazebo 11 gpu_ray does not support multiple
+       vertical rays. Publishes sensor_msgs/PointCloud2 on
+       /libbot/lidar_3d/points; libbot_perception/pointcloud_to_laserscan
+       flattens the mid ring to sensor_msgs/LaserScan on /scan for
+       SLAM Toolbox / Nav2 2D costmaps. -->
+
+  <xacro:macro name="libbot_lidar_3d" params="parent xyz:='0 0 0' rpy:='0 0 0'
+                horizontal_samples:=440 channels:=16
+                vfov_deg:=30.0 hz:=10 min_range:=0.12 max_range:=25.0">
+    <link name="lidar_3d_link">
+      <visual>
+        <geometry><cylinder radius="0.045" length="0.06"/></geometry>
+        <material name="libbot_wheel_black"/>
+      </visual>
+      <collision>
+        <geometry><cylinder radius="0.045" length="0.06"/></geometry>
+      </collision>
+      <inertial>
+        <mass value="0.25"/>
+        <inertia ixx="1e-4" ixy="0" ixz="0" iyy="1e-4" iyz="0" izz="1e-4"/>
+      </inertial>
+    </link>
+
+    <joint name="lidar_3d_joint" type="fixed">
+      <parent link="${parent}"/>
+      <child link="lidar_3d_link"/>
+      <origin xyz="${xyz}" rpy="${rpy}"/>
+    </joint>
+
+    <gazebo reference="lidar_3d_link">
+      <sensor name="lidar_3d_sensor" type="ray">
+        <pose>0 0 0 0 0 0</pose>
+        <always_on>true</always_on>
+        <update_rate>${hz}</update_rate>
+        <visualize>false</visualize>
+        <ray>
+          <scan>
+            <horizontal>
+              <samples>${horizontal_samples}</samples>
+              <resolution>1</resolution>
+              <min_angle>-3.14159265</min_angle>
+              <max_angle>3.14159265</max_angle>
+            </horizontal>
+            <vertical>
+              <samples>${channels}</samples>
+              <resolution>1</resolution>
+              <min_angle>${-vfov_deg/2*0.017453293}</min_angle>
+              <max_angle>${vfov_deg/2*0.017453293}</max_angle>
+            </vertical>
+          </scan>
+          <range>
+            <min>${min_range}</min>
+            <max>${max_range}</max>
+            <resolution>0.01</resolution>
+          </range>
+          <noise>
+            <type>gaussian</type>
+            <mean>0.0</mean>
+            <stddev>0.01</stddev>
+          </noise>
+        </ray>
+        <plugin name="libbot_lidar_3d_plugin" filename="libgazebo_ros_ray_sensor.so">
+          <ros>
+            <namespace>/libbot</namespace>
+            <remapping>~/out:=lidar_3d/points</remapping>
+          </ros>
+          <output_type>sensor_msgs/PointCloud2</output_type>
+          <frame_name>lidar_3d_link</frame_name>
+        </plugin>
+      </sensor>
+    </gazebo>
+  </xacro:macro>
+
+</robot>

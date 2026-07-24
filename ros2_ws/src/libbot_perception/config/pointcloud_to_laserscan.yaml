@@ -1,0 +1,37 @@
+# Flattens the simulated 3D lidar's PointCloud2 into a 2D LaserScan for
+# SLAM Toolbox / AMCL / Nav2's 2D costmap.
+#
+# min_height/max_height are relative to lidar_3d_link, which sits at
+# ~0.975m above the ground (on the short sensor puck on top of the tall
+# chassis -- see libbot_description/urdf/base/payload_platform.urdf.xacro).
+# A thin
+# +/-0.08m band around that height was tried first (matching "read one
+# ring of a real 3D lidar"), but it misses almost everything a library
+# actually contains at desk/table height (~0.7-0.8m) -- library.world's
+# DeskA/DeskB/InfoDesk models are single accurate collision meshes (thin
+# legs + a solid top, not a simplified box), so their tops go completely
+# undetected at that band while their legs are equally invisible, and
+# Nav2 drives straight into them because its costmap shows the space as
+# clear. The robot's chassis+mast is a solid column from ~0.05m (floor
+# clearance) to ~1.0m (just under the mast top) -- anything in that
+# range physically collides with *some* part of the robot, so the band
+# now spans that whole column instead of one ring. This also means a
+# desk's legs (low) and top (high) both correctly show up as obstacles
+# at the desk's actual footprint, rather than one or the other.
+pointcloud_to_laserscan:
+  ros__parameters:
+    use_sim_time: true
+    target_frame: lidar_3d_link
+    transform_tolerance: 0.02
+
+    min_height: -0.925  # ~0.05m above the floor (relative to lidar height ~0.975m)
+    max_height: -0.075  # ~0.90m above the floor, just under the sensor puck top
+
+    angle_min: -3.14159265
+    angle_max: 3.14159265
+    angle_increment: 0.0058   # ~0.33 deg -> matches the 3D lidar's 440 horizontal samples
+    scan_time: 0.1
+    range_min: 0.15
+    range_max: 20.0
+    use_inf: true
+    inf_epsilon: 1.0

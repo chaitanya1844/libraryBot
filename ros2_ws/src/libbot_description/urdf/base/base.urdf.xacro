@@ -1,0 +1,308 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- ============================================================
+       Chassis + 4x mecanum wheel "omni" holonomic base.
+       Wheels are simulated as anisotropic-friction cylinders
+       (Gazebo fdir1 trick) driven kinematically by
+       mecanum_drive_controller, which is the practical equivalent
+       of a swerve module set for holonomic (vx, vy, wz) motion
+       without modeling individual roller physics. See README
+       "Drivetrain design note".
+       ============================================================ -->
+
+  <xacro:property name="chassis_x" value="0.50"/>
+  <xacro:property name="chassis_y" value="0.40"/>
+  <!-- The chassis IS most of the robot's height now (was 0.18m with a
+       separate 0.85m thin mast on top, which looked like a pole stuck in
+       a skateboard, not a real service-robot body). Reference: Peppermint
+       SD20-style AMRs are one tall, thick shell with the lidar sitting
+       almost directly on top, no visible shaft. See payload_platform's
+       sensor puck for the (now short) sensor riser that replaces the
+       mast. -->
+  <xacro:property name="chassis_z" value="0.75"/>
+  <xacro:property name="chassis_mass" value="20.0"/>
+
+  <xacro:property name="wheel_radius" value="0.075"/>
+  <xacro:property name="wheel_width" value="0.05"/>
+  <xacro:property name="wheel_mass" value="1.2"/>
+
+  <!-- half-distances between wheel contact points -->
+  <xacro:property name="wheel_sep_x" value="0.19"/>
+  <xacro:property name="wheel_sep_y" value="0.21"/>
+
+  <!-- Two-tone commercial-AMR look (teal shell + mid-grey panels/trim),
+       restyled to read like a Peppermint SD20-class service robot rather
+       than a bare grey box. Gazebo Classic's per-link <material> only
+       accepts a handful of canned Ogre script names (no arbitrary RGBA),
+       so the Gazebo/* tags below are the closest built-in match
+       (Gazebo/Turquoise). RViz's RobotModel display reads these URDF
+       <material> rgba values directly and renders the exact color. -->
+  <material name="libbot_body_teal">
+    <color rgba="0.10 0.68 0.64 1.0"/>
+  </material>
+  <material name="libbot_body_grey">
+    <color rgba="0.40 0.42 0.44 1.0"/>
+  </material>
+  <material name="libbot_panel_dark">
+    <color rgba="0.10 0.10 0.11 1.0"/>
+  </material>
+  <material name="libbot_wheel_black">
+    <color rgba="0.05 0.05 0.05 1.0"/>
+  </material>
+  <material name="libbot_seam_white">
+    <color rgba="0.92 0.93 0.94 1.0"/>
+  </material>
+
+  <xacro:macro name="box_inertia" params="mass x y z">
+    <inertia
+      ixx="${mass/12.0*(y*y+z*z)}" ixy="0.0" ixz="0.0"
+      iyy="${mass/12.0*(x*x+z*z)}" iyz="0.0"
+      izz="${mass/12.0*(x*x+y*y)}"/>
+  </xacro:macro>
+
+  <xacro:macro name="cylinder_inertia" params="mass r h">
+    <inertia
+      ixx="${mass/12.0*(3*r*r+h*h)}" ixy="0.0" ixz="0.0"
+      iyy="${mass/12.0*(3*r*r+h*h)}" iyz="0.0"
+      izz="${mass/2.0*r*r}"/>
+  </xacro:macro>
+
+  <!-- base_footprint: ground projection, required by nav2 / robot_localization conventions -->
+  <link name="base_footprint"/>
+
+  <joint name="base_footprint_joint" type="fixed">
+    <parent link="base_footprint"/>
+    <child link="base_link"/>
+    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+  </joint>
+
+  <link name="base_link">
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_x} ${chassis_y} ${chassis_z}"/>
+      </geometry>
+      <material name="libbot_body_teal"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <geometry>
+        <box size="${chassis_x} ${chassis_y} ${chassis_z}"/>
+      </geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <mass value="${chassis_mass}"/>
+      <!-- Roll/pitch (ixx/iyy) are boosted well above the box's natural
+           values (~0.22/0.33) instead of using box_inertia directly. The
+           ~0.85m mast puts the lidar/camera roughly a meter above the
+           chassis; a collision up there (driving into a desk, teleop
+           misjudging clearance) applies its force at that height, and
+           against the base's actual (fairly narrow, ~0.4-0.5m) footprint
+           that's enough torque to physically tip a normal-inertia chassis
+           over, which happened during mapping testing. Yaw (izz) is left
+           at its natural value so turning stays responsive; only the
+           tip-over axes are stiffened, standing in for what a real base
+           would get from a low, wide chassis or active gyro stabilization
+           without redesigning the footprint the user asked to keep narrow
+           enough for the aisles. -->
+      <inertia ixx="2.5" ixy="0.0" ixz="0.0" iyy="3.5" iyz="0.0" izz="0.4783"/>
+    </inertial>
+  </link>
+
+  <!-- ============ cosmetic-only body panels (no collision/inertia of
+       their own, all fixed to base_link, which already carries the
+       real collision box) restyling the chassis into a two-tone,
+       stepped-fascia look instead of a plain box. ============ -->
+
+  <!-- Dark grey skirt band around the lower chassis, like the reference
+       robot's lower bumper/trim band. -->
+  <link name="chassis_skirt_link">
+    <visual>
+      <geometry><box size="${chassis_x + 0.01} ${chassis_y + 0.01} 0.04"/></geometry>
+      <material name="libbot_body_grey"/>
+    </visual>
+  </link>
+  <joint name="chassis_skirt_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_skirt_link"/>
+    <origin xyz="0 0 ${-chassis_z/2 + 0.02}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Seam line between the grey skirt and the teal shell. -->
+  <link name="deck_stripe_link">
+    <visual>
+      <geometry><box size="${chassis_x + 0.005} 0.015 0.01"/></geometry>
+      <material name="libbot_seam_white"/>
+    </visual>
+  </link>
+  <joint name="deck_stripe_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="deck_stripe_link"/>
+    <origin xyz="0 ${chassis_y/2} ${-chassis_z/2 + 0.045}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Sloped front-top fascia (a rotated box, approximating the
+       reference's angled canopy front) sitting proud of the main box on
+       the forward edge. -->
+  <link name="chassis_fascia_link">
+    <visual>
+      <geometry><box size="0.22 ${chassis_y*0.96} 0.10"/></geometry>
+      <material name="libbot_body_teal"/>
+    </visual>
+  </link>
+  <joint name="chassis_fascia_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_fascia_link"/>
+    <origin xyz="${chassis_x/2 - 0.05} 0 ${chassis_z/2 + 0.03}" rpy="0 0.45 0"/>
+  </joint>
+
+  <!-- Dark recessed "face" panel in the upper-front area, with two small
+       square "eye" sensor-window accents, mirroring the reference's
+       front sensor cluster look (purely cosmetic; the real lidar/camera
+       are on the puck riser / body top, see payload_platform). -->
+  <link name="chassis_face_link">
+    <visual>
+      <geometry><box size="0.02 ${chassis_y*0.62} ${chassis_z*0.32}"/></geometry>
+      <material name="libbot_panel_dark"/>
+    </visual>
+  </link>
+  <joint name="chassis_face_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_face_link"/>
+    <origin xyz="${chassis_x/2 + 0.001} 0 ${chassis_z*0.18}" rpy="0 0 0"/>
+  </joint>
+
+  <xacro:macro name="face_eye" params="prefix y_off">
+    <link name="face_eye_${prefix}_link">
+      <visual>
+        <geometry><box size="0.01 0.06 0.05"/></geometry>
+        <material name="libbot_seam_white"/>
+      </visual>
+    </link>
+    <joint name="face_eye_${prefix}_joint" type="fixed">
+      <parent link="chassis_face_link"/>
+      <child link="face_eye_${prefix}_link"/>
+      <origin xyz="0.011 ${y_off} 0.0" rpy="0 0 0"/>
+    </joint>
+  </xacro:macro>
+  <xacro:face_eye prefix="left"  y_off="0.07"/>
+  <xacro:face_eye prefix="right" y_off="-0.07"/>
+
+  <!-- Grey side compartment panel, like the reference's large flat side
+       door, mounted flush on the +Y side. -->
+  <link name="chassis_side_panel_link">
+    <visual>
+      <geometry><box size="${chassis_x*0.55} 0.015 ${chassis_z*0.85}"/></geometry>
+      <material name="libbot_body_grey"/>
+    </visual>
+  </link>
+  <joint name="chassis_side_panel_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="chassis_side_panel_link"/>
+    <origin xyz="${-chassis_x*0.05} ${chassis_y/2 + 0.001} 0.005" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="chassis_skirt_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="deck_stripe_link"><material>Gazebo/White</material></gazebo>
+  <gazebo reference="chassis_fascia_link"><material>Gazebo/Turquoise</material></gazebo>
+  <gazebo reference="chassis_face_link"><material>Gazebo/Black</material></gazebo>
+  <gazebo reference="face_eye_left_link"><material>Gazebo/White</material></gazebo>
+  <gazebo reference="face_eye_right_link"><material>Gazebo/White</material></gazebo>
+  <gazebo reference="chassis_side_panel_link"><material>Gazebo/Grey</material></gazebo>
+
+  <!-- ============ wheels ============ -->
+  <!-- fdir1 sets the near-zero-friction (roller) axis in the wheel's local frame,
+       approximating mecanum rollers at 45 deg. X-pattern: FL/RR rollers at +45,
+       FR/RL rollers at -45, matching standard mecanum wheel arrangement. -->
+  <xacro:macro name="mecanum_wheel" params="prefix x_off y_off roller_sign">
+    <link name="${prefix}_wheel_link">
+      <visual>
+        <origin xyz="0 0 0" rpy="1.5707963 0 0"/>
+        <geometry>
+          <cylinder radius="${wheel_radius}" length="${wheel_width}"/>
+        </geometry>
+        <material name="libbot_wheel_black"/>
+      </visual>
+      <!-- No collision geometry: these wheels are visual-only (they spin
+           for show, driven by mecanum_drive_controller). Actual ground
+           support and holonomic propulsion come from the chassis skid
+           plate and the planar_move plugin (see the skid_plate_link and
+           gazebo/planar_move.urdf.xacro below). -->
+      <inertial>
+        <origin xyz="0 0 0" rpy="0 0 0"/>
+        <mass value="${wheel_mass}"/>
+        <xacro:cylinder_inertia mass="${wheel_mass}" r="${wheel_radius}" h="${wheel_width}"/>
+      </inertial>
+    </link>
+
+    <joint name="${prefix}_wheel_joint" type="continuous">
+      <parent link="base_link"/>
+      <child link="${prefix}_wheel_link"/>
+      <!-- base_link is already wheel_radius above base_footprint/ground
+           (see base_footprint_joint), so wheel joints need zero additional
+           Z offset for the wheel centers to sit at ground + wheel_radius. -->
+      <origin xyz="${x_off} ${y_off} 0" rpy="0 0 0"/>
+      <axis xyz="0 1 0"/>
+      <!-- effort/velocity limits are required even on a continuous joint:
+           gazebo_ros2_control's velocity command interface derives the
+           ODE joint motor's max force from here, and without them the
+           wheel motor has ~0 torque and can't actually move the chassis. -->
+      <limit effort="20.0" velocity="30.0"/>
+      <dynamics damping="0.15" friction="0.05"/>
+    </joint>
+
+    <gazebo reference="${prefix}_wheel_link">
+      <material>Gazebo/FlatBlack</material>
+    </gazebo>
+  </xacro:macro>
+
+  <xacro:mecanum_wheel prefix="front_left"  x_off="${wheel_sep_x}"  y_off="${wheel_sep_y}"  roller_sign="1"/>
+  <xacro:mecanum_wheel prefix="front_right" x_off="${wheel_sep_x}"  y_off="${-wheel_sep_y}" roller_sign="-1"/>
+  <xacro:mecanum_wheel prefix="rear_left"   x_off="${-wheel_sep_x}" y_off="${wheel_sep_y}"  roller_sign="-1"/>
+  <xacro:mecanum_wheel prefix="rear_right"  x_off="${-wheel_sep_x}" y_off="${-wheel_sep_y}" roller_sign="1"/>
+
+  <gazebo reference="base_link">
+    <material>Gazebo/Turquoise</material>
+  </gazebo>
+
+  <!-- Single flat ground-support surface for the whole chassis, replacing
+       per-wheel collision. Real propulsion is 100% from the planar_move
+       plugin (gazebo/planar_move.urdf.xacro), which sets body velocity
+       directly each physics step; per-wheel anisotropic (fdir1) friction
+       contacts turned out to fight that imposed velocity enough to starve
+       Nav2's progress checker on real goals, especially for yaw rate. One
+       simple, uniform-friction contact patch removes that interference
+       entirely. See README "Drivetrain design note" for the full story. -->
+  <link name="skid_plate_link">
+    <collision>
+      <geometry><box size="${chassis_x*0.85} ${chassis_y*0.85} 0.01"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <inertia ixx="0.001" ixy="0" ixz="0" iyy="0.001" iyz="0" izz="0.001"/>
+    </inertial>
+  </link>
+
+  <joint name="skid_plate_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="skid_plate_link"/>
+    <origin xyz="0 0 ${-wheel_radius + 0.005}" rpy="0 0 0"/>
+  </joint>
+
+  <gazebo reference="skid_plate_link">
+    <!-- Near-zero: planar_move sets body velocity directly every physics
+         step, so this contact only needs to hold the chassis up against
+         gravity, not provide traction. Any real friction here (even a
+         "reasonable" 0.4) is a large-area contact patch under most of the
+         footprint and resists planar_move's imposed velocity, yaw rate
+         most of all (see README "Drivetrain design note"). -->
+    <mu1>0.02</mu1>
+    <mu2>0.02</mu2>
+    <kp>1e5</kp>
+    <kd>50.0</kd>
+    <minDepth>0.001</minDepth>
+  </gazebo>
+
+</robot>

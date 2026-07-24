@@ -1,0 +1,46 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- Authoritative holonomic propulsion + odometry source.
+
+       Gazebo Classic's anisotropic wheel friction (fdir1) for mecanum
+       rollers turned out to be too sensitive to ODE solver iteration
+       count / contact stiffness to reliably convert commanded wheel
+       spin into chassis motion (see README "Drivetrain design note").
+       gazebo_ros_planar_move integrates body velocity directly and is
+       the standard, robust way to simulate a holonomic/omni base.
+
+       mecanum_drive_controller + the wheel joints (ros2_control.urdf.xacro)
+       are kept and fed the SAME command topic purely so the wheels spin
+       correctly in RViz/Gazebo for visual realism; they are not what
+       actually moves the robot. EKF fuses THIS plugin's odometry
+       (/libbot/planar_odom), not the mecanum controller's. -->
+  <gazebo>
+    <plugin name="libbot_planar_move" filename="libgazebo_ros_planar_move.so">
+      <ros>
+        <namespace>/libbot</namespace>
+        <remapping>cmd_vel:=mecanum_drive_controller/reference_unstamped</remapping>
+        <remapping>odom:=planar_odom</remapping>
+      </ros>
+
+      <!-- Applied every physics step (matches the world's 1000 Hz physics
+           rate) so wheel-ground contact forces don't have room to fight
+           the commanded body velocity between plugin updates. This
+           mattered most for yaw rate, which the 4 wheel contact points
+           resist more (larger moment arm) than pure translation does. -->
+      <update_rate>1000</update_rate>
+      <publish_rate>50</publish_rate>
+
+      <publish_odom>true</publish_odom>
+      <publish_odom_tf>false</publish_odom_tf>
+
+      <odometry_frame>odom</odometry_frame>
+      <robot_base_frame>base_footprint</robot_base_frame>
+
+      <covariance_x>0.0001</covariance_x>
+      <covariance_y>0.0001</covariance_y>
+      <covariance_yaw>0.001</covariance_yaw>
+    </plugin>
+  </gazebo>
+
+</robot>
