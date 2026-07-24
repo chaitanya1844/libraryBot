@@ -106,6 +106,18 @@ def generate_launch_description():
         # 4. Lidar -> 2D scan for SLAM/Nav2
         _include('libbot_perception', 'lidar_processing.launch.py', {}, delay=9.0),
 
+        # Breadcrumb trail of where the robot has actually been, for RViz
+        # (alongside Nav2's GlobalPlan/LocalPlan, which only show where
+        # it's *going*). Harmless to start early -- it just waits for
+        # /odometry/filtered to exist.
+        TimerAction(period=12.0, actions=[Node(
+            package='libbot_perception',
+            executable='trail_publisher_node.py',
+            name='trail_publisher',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+        )]),
+
         # 5. Localization: EKF always; SLAM (mapping) or AMCL (navigation) exclusively
         _include('libbot_mapping', 'mapping.launch.py', {'use_sim_time': use_sim_time},
                  condition=IfCondition(is_mapping), delay=11.0),

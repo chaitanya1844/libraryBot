@@ -146,6 +146,40 @@ Visualization Manager:
       Line Width: 0.03
       Enabled: true
 
+    # Breadcrumb trail of where the robot has actually driven (published
+    # by libbot_perception's trail_publisher_node), distinct from
+    # GlobalPlan/LocalPlan above which show where it's *going*. Good for
+    # demos: this is "what it did", those are "what it's about to do".
+    - Class: rviz_default_plugins/Path
+      Name: Trail
+      Topic:
+        Value: /libbot/trail
+        Durability Policy: Volatile
+      Color: 30; 144; 255
+      Line Width: 0.025
+      Pose Style: None
+      Enabled: true
+
+    # Nav2's actual planning footprint polygons -- shows the exact
+    # collision boundary the planner/controller reason about, not just
+    # the visual robot model. Useful for demonstrating *why* Nav2 picked
+    # a given path (e.g. why it won't cut a corner close to a shelf).
+    - Class: rviz_default_plugins/Polygon
+      Name: LocalFootprint
+      Topic:
+        Value: /local_costmap/published_footprint
+        Durability Policy: Volatile
+      Color: 255; 255; 0
+      Enabled: true
+
+    - Class: rviz_default_plugins/Polygon
+      Name: GlobalFootprint
+      Topic:
+        Value: /global_costmap/published_footprint
+        Durability Policy: Volatile
+      Color: 0; 255; 255
+      Enabled: false
+
   Global Options:
     Background Color: 20; 20; 24
     Fixed Frame: map

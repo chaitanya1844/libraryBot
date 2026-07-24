@@ -71,10 +71,19 @@
   <!-- base_footprint: ground projection, required by nav2 / robot_localization conventions -->
   <link name="base_footprint"/>
 
+  <!-- base_link's own box geometry is centered on its origin (extends
+       +/-chassis_z/2), so lifting that origin to chassis_z/2 above the
+       footprint puts the box's BOTTOM flush with the ground, not
+       wheel_radius, which was only correct back when chassis_z (0.18m)
+       happened to be roughly comparable to wheel_radius. With the
+       0.75m-tall chassis, leaving this at wheel_radius buried ~0.3m of
+       the box below the floor and left the wheels (mounted at base_link's
+       own vertical center, see mecanum_wheel below) floating around
+       mid-body instead of at the bottom. -->
   <joint name="base_footprint_joint" type="fixed">
     <parent link="base_footprint"/>
     <child link="base_link"/>
-    <origin xyz="0 0 ${wheel_radius}" rpy="0 0 0"/>
+    <origin xyz="0 0 ${chassis_z/2}" rpy="0 0 0"/>
   </joint>
 
   <link name="base_link">
@@ -240,10 +249,13 @@
     <joint name="${prefix}_wheel_joint" type="continuous">
       <parent link="base_link"/>
       <child link="${prefix}_wheel_link"/>
-      <!-- base_link is already wheel_radius above base_footprint/ground
-           (see base_footprint_joint), so wheel joints need zero additional
-           Z offset for the wheel centers to sit at ground + wheel_radius. -->
-      <origin xyz="${x_off} ${y_off} 0" rpy="0 0 0"/>
+      <!-- base_link's origin is chassis_z/2 above the ground (box bottom
+           flush with the floor, see base_footprint_joint), so wheel
+           centers need to sit wheel_radius above the ground, which is
+           chassis_z/2 below base_link's own origin, not 0. Mounting
+           them at 0 (base_link's vertical center) put them floating
+           around mid-body once the chassis got tall. -->
+      <origin xyz="${x_off} ${y_off} ${wheel_radius - chassis_z/2}" rpy="0 0 0"/>
       <axis xyz="0 1 0"/>
       <!-- effort/velocity limits are required even on a continuous joint:
            gazebo_ros2_control's velocity command interface derives the
@@ -285,10 +297,15 @@
     </inertial>
   </link>
 
+  <!-- Just above base_link's own bottom face (-chassis_z/2), which is
+       flush with the ground, same reasoning as base_footprint_joint
+       and the wheel joints above: offsets here are relative to
+       base_link's origin, not the ground, so this has to track
+       chassis_z too, not a fixed wheel_radius-based offset. -->
   <joint name="skid_plate_joint" type="fixed">
     <parent link="base_link"/>
     <child link="skid_plate_link"/>
-    <origin xyz="0 0 ${-wheel_radius + 0.005}" rpy="0 0 0"/>
+    <origin xyz="0 0 ${-chassis_z/2 + 0.005}" rpy="0 0 0"/>
   </joint>
 
   <gazebo reference="skid_plate_link">
