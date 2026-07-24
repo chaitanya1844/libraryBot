@@ -16,7 +16,6 @@
   <exec_depend>libbot_mapping</exec_depend>
   <exec_depend>libbot_navigation</exec_depend>
   <exec_depend>libbot_perception</exec_depend>
-  <exec_depend>libbot_sorting</exec_depend>
   <exec_depend>libbot_control_panel</exec_depend>
   <exec_depend>rviz2</exec_depend>
 

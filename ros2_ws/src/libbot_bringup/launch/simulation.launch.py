@@ -16,8 +16,8 @@ the panel buttons, e.g.:
     ros2 launch libbot_bringup simulation.launch.py mode:=navigation map:=/path/to/map.yaml
 
 `mode:=navigation` here only starts AMCL (localization) -- Nav2 itself
-(planning/control) plus RFID/perception/sorting is the separate
-`autonomy.launch.py`, started once localization is confirmed working
+(planning/control) is the separate `autonomy.launch.py`, started once
+localization is confirmed working
 (Nav2 nested inside this same launch file hit a `launch_ros`/
 `IncludeLaunchDescription` parameter-loading quirk that reliably drops
 DWB's critics list when started this way -- see README "Two-stage

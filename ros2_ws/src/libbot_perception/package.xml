@@ -3,7 +3,7 @@
 <package format="3">
   <name>libbot_perception</name>
   <version>0.1.0</version>
-  <description>Lidar/point-cloud processing, simulated RFID reading, and depth-camera shelf-slot inference for libraryBot</description>
+  <description>Lidar/point-cloud processing and the robot's driven-path trail for libraryBot</description>
   <maintainer email="chaitanyabht@gmail.com">chaitanyabht</maintainer>
   <license>Apache-2.0</license>
 
@@ -11,18 +11,9 @@
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
   <depend>rclpy</depend>
-  <depend>libbot_msgs</depend>
   <exec_depend>pointcloud_to_laserscan</exec_depend>
-  <exec_depend>gazebo_msgs</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>sensor_msgs_py</exec_depend>
   <exec_depend>geometry_msgs</exec_depend>
   <exec_depend>nav_msgs</exec_depend>
-  <exec_depend>python3-numpy</exec_depend>
-  <exec_depend>python3-yaml</exec_depend>
-  <exec_depend>cv_bridge</exec_depend>
-  <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>tf2_geometry_msgs</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

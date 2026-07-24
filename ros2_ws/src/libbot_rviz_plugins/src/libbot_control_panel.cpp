@@ -9,20 +9,6 @@ namespace libbot_rviz_plugins
 namespace
 {
 constexpr const char * kCmdVelTopic = "/libbot/mecanum_drive_controller/reference_unstamped";
-
-const char * stateName(uint8_t state)
-{
-  switch (state) {
-    case libbot_msgs::msg::SortTaskStatus::IDLE: return "Idle";
-    case libbot_msgs::msg::SortTaskStatus::AWAITING_RFID: return "Awaiting book";
-    case libbot_msgs::msg::SortTaskStatus::NAVIGATING_TO_SHELF: return "Navigating to shelf";
-    case libbot_msgs::msg::SortTaskStatus::LOCATING_SLOT: return "Locating open slot";
-    case libbot_msgs::msg::SortTaskStatus::PLACING_BOOK: return "Placing book";
-    case libbot_msgs::msg::SortTaskStatus::RETURNING_TO_STATION: return "Returning to station";
-    case libbot_msgs::msg::SortTaskStatus::ERROR: return "ERROR";
-    default: return "--";
-  }
-}
 }  // namespace
 
 LibbotControlPanel::LibbotControlPanel(QWidget * parent)
@@ -46,21 +32,9 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   // ---------------- status ----------------
   auto * status_box = new QGroupBox("Status");
   auto * status_grid = new QGridLayout(status_box);
-  state_label_ = new QLabel("--");
-  tag_label_ = new QLabel("--");
-  shelf_label_ = new QLabel("--");
-  message_label_ = new QLabel("--");
-  count_label_ = new QLabel("0");
   pose_label_ = new QLabel("--");
-  int row = 0;
-  for (auto pair : std::initializer_list<std::pair<const char *, QLabel *>>{
-      {"State", state_label_}, {"Tag", tag_label_}, {"Shelf", shelf_label_},
-      {"Message", message_label_}, {"Books sorted", count_label_}, {"Pose", pose_label_}})
-  {
-    status_grid->addWidget(new QLabel(QString("<b>%1:</b>").arg(pair.first)), row, 0);
-    status_grid->addWidget(pair.second, row, 1);
-    row++;
-  }
+  status_grid->addWidget(new QLabel("<b>Pose:</b>"), 0, 0);
+  status_grid->addWidget(pose_label_, 0, 1);
   root->addWidget(status_box);
 
   // ---------------- e-stop ----------------
@@ -79,37 +53,6 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   connect(estop_button_, &QPushButton::toggled, this, &LibbotControlPanel::onEStopToggled);
   estop_v->addWidget(estop_button_);
   root->addWidget(estop_box);
-
-  // ---------------- sorting ----------------
-  auto * sort_box = new QGroupBox("Sorting");
-  auto * sort_v = new QVBoxLayout(sort_box);
-
-  auto * toggle_row = new QHBoxLayout();
-  auto * start_btn = new QPushButton("Start / Resume Sorting");
-  auto * pause_btn = new QPushButton("Pause Sorting");
-  connect(start_btn, &QPushButton::clicked, this, &LibbotControlPanel::onStartSorting);
-  connect(pause_btn, &QPushButton::clicked, this, &LibbotControlPanel::onPauseSorting);
-  toggle_row->addWidget(start_btn);
-  toggle_row->addWidget(pause_btn);
-  sort_v->addLayout(toggle_row);
-
-  auto * form_row = new QHBoxLayout();
-  tag_input_ = new QLineEdit();
-  tag_input_->setPlaceholderText("tag_id (blank = auto)");
-  title_input_ = new QLineEdit();
-  title_input_->setPlaceholderText("title (optional)");
-  genre_combo_ = new QComboBox();
-  genre_combo_->addItems({"fiction", "scifi", "mystery", "biography", "history",
-      "children", "reference", "poetry"});
-  auto * queue_btn = new QPushButton("Queue manual sort");
-  connect(queue_btn, &QPushButton::clicked, this, &LibbotControlPanel::onQueueManualSort);
-  form_row->addWidget(tag_input_);
-  form_row->addWidget(title_input_);
-  form_row->addWidget(genre_combo_);
-  form_row->addWidget(queue_btn);
-  sort_v->addLayout(form_row);
-
-  root->addWidget(sort_box);
 
   // ---------------- camera ----------------
   // RViz's own Image display crashes this GPU/driver combination
@@ -148,7 +91,9 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
     "until the map looks complete in RViz, then Save Map.<br>"
     "2. Start Localization to load the saved map and locate the robot on "
     "it (AMCL) -- check the particle cloud converges in RViz.<br>"
-    "3. Start Navigation to bring up Nav2 + RFID + sorting.</small>");
+    "3. Start Navigation to bring up Nav2. Then use RViz's own "
+    "\"2D Pose Estimate\" tool to set where the robot starts and "
+    "\"Nav2 Goal\" to send it anywhere on the map.</small>");
   mode_help->setWordWrap(true);
   mode_grid->addWidget(mode_help, 3, 0, 1, 2);
 
@@ -179,13 +124,6 @@ void LibbotControlPanel::onInitialize()
 
   cmd_pub_ = node_->create_publisher<geometry_msgs::msg::Twist>(kCmdVelTopic, 10);
 
-  status_sub_ = node_->create_subscription<libbot_msgs::msg::SortTaskStatus>(
-    "/libbot/sorting/status", 10,
-    [this](libbot_msgs::msg::SortTaskStatus::SharedPtr msg) {
-      std::lock_guard<std::mutex> lock(state_mutex_);
-      latest_status_ = msg;
-    });
-
   odom_sub_ = node_->create_subscription<nav_msgs::msg::Odometry>(
     "/odometry/filtered", 10,
     [this](nav_msgs::msg::Odometry::SharedPtr msg) {
@@ -193,8 +131,6 @@ void LibbotControlPanel::onInitialize()
       latest_odom_ = msg;
     });
 
-  set_enabled_client_ = node_->create_client<std_srvs::srv::SetBool>("/libbot/sorting/set_enabled");
-  sort_book_client_ = node_->create_client<libbot_msgs::srv::SortBook>("/libbot/sorting/sort_book");
   switch_controller_client_ = node_->create_client<controller_manager_msgs::srv::SwitchController>(
     "/libbot/controller_manager/switch_controller");
 
@@ -219,16 +155,6 @@ void LibbotControlPanel::onSpinTimer()
 void LibbotControlPanel::onUiTimer()
 {
   std::lock_guard<std::mutex> lock(state_mutex_);
-  if (latest_status_) {
-    state_label_->setText(stateName(latest_status_->state));
-    tag_label_->setText(
-      latest_status_->tag_id.empty() ? "--" : QString::fromStdString(latest_status_->tag_id));
-    shelf_label_->setText(
-      latest_status_->target_shelf_id.empty() ? "--" :
-      QString::fromStdString(latest_status_->target_shelf_id));
-    message_label_->setText(QString::fromStdString(latest_status_->message));
-    count_label_->setText(QString::number(latest_status_->books_sorted_total));
-  }
   if (latest_odom_) {
     const auto & p = latest_odom_->pose.pose;
     double yaw = std::atan2(2.0 * p.orientation.z * p.orientation.w, 1.0 - 2.0 * p.orientation.z * p.orientation.z);
@@ -275,54 +201,6 @@ void LibbotControlPanel::setEStop(bool engaged)
               : "E-stop released: drive controller reactivated");
 }
 
-void LibbotControlPanel::onStartSorting()
-{
-  if (!set_enabled_client_->service_is_ready()) {
-    log("sorting_task_manager not running yet");
-    return;
-  }
-  auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-  req->data = true;
-  set_enabled_client_->async_send_request(req);
-  log("Sorting resumed");
-}
-
-void LibbotControlPanel::onPauseSorting()
-{
-  if (!set_enabled_client_->service_is_ready()) {
-    log("sorting_task_manager not running yet");
-    return;
-  }
-  auto req = std::make_shared<std_srvs::srv::SetBool::Request>();
-  req->data = false;
-  set_enabled_client_->async_send_request(req);
-  log("Sorting paused");
-}
-
-void LibbotControlPanel::onQueueManualSort()
-{
-  if (!sort_book_client_->service_is_ready()) {
-    log("sorting_task_manager not running yet");
-    return;
-  }
-  auto req = std::make_shared<libbot_msgs::srv::SortBook::Request>();
-  req->tag_id = tag_input_->text().toStdString();
-  req->book_title = title_input_->text().toStdString();
-  req->genre = genre_combo_->currentText().toStdString();
-  req->target_shelf_id = "";
-
-  sort_book_client_->async_send_request(
-    req,
-    [this](rclcpp::Client<libbot_msgs::srv::SortBook>::SharedFuture future) {
-      auto resp = future.get();
-      QString msg = QString("Sort request: %1 - %2")
-      .arg(resp->accepted ? "OK" : "REJECTED")
-      .arg(QString::fromStdString(resp->message));
-      QMetaObject::invokeMethod(this, [this, msg]() {log(msg);}, Qt::QueuedConnection);
-    });
-  log("Queuing sort request...");
-}
-
 namespace
 {
 QString switchModeScript()
@@ -355,7 +233,7 @@ void LibbotControlPanel::onStartLocalization()
 void LibbotControlPanel::onStartNavigation()
 {
   QProcess::startDetached("bash", {"-c", switchModeScript() + " navigation"});
-  log("Starting Nav2 + RFID + sorting (requires localization already running)");
+  log("Starting Nav2 (requires localization already running)");
 }
 
 void LibbotControlPanel::onSaveMap()

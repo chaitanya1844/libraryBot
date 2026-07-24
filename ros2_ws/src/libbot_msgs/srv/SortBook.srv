@@ -1,8 +1,0 @@
-# Manually enqueue a book sort job (used by the control panel "manual sort" form)
-string tag_id
-string book_title
-string genre
-string target_shelf_id     # optional: leave empty to resolve via genre lookup table
----
-bool accepted
-string message

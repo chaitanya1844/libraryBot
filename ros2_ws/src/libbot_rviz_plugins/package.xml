@@ -3,7 +3,7 @@
 <package format="3">
   <name>libbot_rviz_plugins</name>
   <version>0.1.0</version>
-  <description>Native RViz2 panel plugin embedding libraryBot's robot controls (manual drive, e-stop, sorting, mode switching) directly in the RViz window</description>
+  <description>Native RViz2 panel plugin embedding libraryBot's robot controls (e-stop, camera view, mode switching) directly in the RViz window</description>
   <maintainer email="chaitanyabht@gmail.com">chaitanyabht</maintainer>
   <license>Apache-2.0</license>
 
@@ -17,7 +17,6 @@
   <depend>nav_msgs</depend>
   <depend>std_srvs</depend>
   <depend>controller_manager_msgs</depend>
-  <depend>libbot_msgs</depend>
   <exec_depend>rqt_image_view</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

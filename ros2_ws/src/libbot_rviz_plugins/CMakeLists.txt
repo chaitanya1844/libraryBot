@@ -18,7 +18,6 @@ find_package(geometry_msgs REQUIRED)
 find_package(nav_msgs REQUIRED)
 find_package(std_srvs REQUIRED)
 find_package(controller_manager_msgs REQUIRED)
-find_package(libbot_msgs REQUIRED)
 
 include_directories(include)
 
@@ -40,7 +39,6 @@ ament_target_dependencies(${PROJECT_NAME}
   nav_msgs
   std_srvs
   controller_manager_msgs
-  libbot_msgs
 )
 
 target_link_libraries(${PROJECT_NAME} Qt5::Widgets)
@@ -68,7 +66,7 @@ install(FILES plugins_description.xml
 ament_export_include_directories(include)
 ament_export_libraries(${PROJECT_NAME})
 ament_export_targets(export_${PROJECT_NAME})
-ament_export_dependencies(rclcpp rviz_common pluginlib geometry_msgs nav_msgs std_srvs controller_manager_msgs libbot_msgs)
+ament_export_dependencies(rclcpp rviz_common pluginlib geometry_msgs nav_msgs std_srvs controller_manager_msgs)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

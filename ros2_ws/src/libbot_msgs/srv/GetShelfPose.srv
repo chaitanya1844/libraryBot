@@ -1,6 +1,0 @@
-# Look up the navigation goal pose (in map frame) for a given shelf id,
-# as defined in libbot_sorting/config/shelf_map.yaml
-string shelf_id
----
-bool found
-geometry_msgs/PoseStamped pose

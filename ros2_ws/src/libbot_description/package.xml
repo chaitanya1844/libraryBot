@@ -3,7 +3,7 @@
 <package format="3">
   <name>libbot_description</name>
   <version>0.1.0</version>
-  <description>URDF/Xacro robot description for the libraryBot omni-mecanum book-sorting AMR</description>
+  <description>URDF/Xacro robot description for the libraryBot omni-mecanum autonomous navigation AMR</description>
   <maintainer email="chaitanyabht@gmail.com">chaitanyabht</maintainer>
   <license>Apache-2.0</license>
 

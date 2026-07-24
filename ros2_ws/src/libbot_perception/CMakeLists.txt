@@ -12,8 +12,6 @@ install(DIRECTORY config launch
 )
 
 install(PROGRAMS
-  libbot_perception/rfid_reader_node.py
-  libbot_perception/shelf_slot_detector_node.py
   libbot_perception/trail_publisher_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
