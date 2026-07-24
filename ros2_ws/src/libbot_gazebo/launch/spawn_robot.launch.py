@@ -47,7 +47,8 @@ def generate_launch_description():
         DeclareLaunchArgument('x', default_value='1.0'),
         DeclareLaunchArgument('y', default_value='3.3'),
         DeclareLaunchArgument('z', default_value='0.05'),
-        DeclareLaunchArgument('yaw', default_value='1.5708'),
+        # Flipped 180deg from the original 1.5708 spawn yaw per user request.
+        DeclareLaunchArgument('yaw', default_value='-1.5708'),
 
         Node(
             package='robot_state_publisher',

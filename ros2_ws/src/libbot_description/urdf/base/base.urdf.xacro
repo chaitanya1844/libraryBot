@@ -21,7 +21,13 @@
        sensor puck for the (now short) sensor riser that replaces the
        mast. -->
   <xacro:property name="chassis_z" value="0.75"/>
-  <xacro:property name="chassis_mass" value="20.0"/>
+  <!-- Real AMRs this size run 30-45kg (batteries, motors, compute), and
+       that mass matters here: it's not just "heavier feels more real",
+       more mass directly means more rotational inertia (I scales with
+       mass), which is what actually resists a collision's angular
+       impulse and keeps the robot from tipping. See base_link's
+       <inertial> below for the other half of the fix (a low CoG). -->
+  <xacro:property name="chassis_mass" value="35.0"/>
 
   <xacro:property name="wheel_radius" value="0.075"/>
   <xacro:property name="wheel_width" value="0.05"/>
@@ -101,22 +107,29 @@
       </geometry>
     </collision>
     <inertial>
-      <origin xyz="0 0 0" rpy="0 0 0"/>
+      <!-- Real service robots put batteries/heavy components low in the
+           chassis specifically to keep the center of gravity low and
+           resist tipping. This is the actual physical fix, not just a
+           bigger-number hack. Offsetting the inertial origin down to
+           near the bottom quarter of the 0.75m-tall box (rather than
+           the box's geometric center at z=0) simulates that: the
+           restoring gravity torque when something pushes the top of the
+           robot scales with how far the CoG has to swing sideways
+           before it crosses the support base's edge, and a lower CoG
+           makes that swing much larger for the same tip angle. -->
+      <origin xyz="0 0 -0.25" rpy="0 0 0"/>
       <mass value="${chassis_mass}"/>
-      <!-- Roll/pitch (ixx/iyy) are boosted well above the box's natural
-           values (~0.22/0.33) instead of using box_inertia directly. The
-           ~0.85m mast puts the lidar/camera roughly a meter above the
-           chassis; a collision up there (driving into a desk, teleop
-           misjudging clearance) applies its force at that height, and
-           against the base's actual (fairly narrow, ~0.4-0.5m) footprint
-           that's enough torque to physically tip a normal-inertia chassis
-           over, which happened during mapping testing. Yaw (izz) is left
-           at its natural value so turning stays responsive; only the
-           tip-over axes are stiffened, standing in for what a real base
-           would get from a low, wide chassis or active gyro stabilization
-           without redesigning the footprint the user asked to keep narrow
-           enough for the aisles. -->
-      <inertia ixx="2.5" ixy="0.0" ixz="0.0" iyy="3.5" iyz="0.0" izz="0.4783"/>
+      <!-- Roll/pitch (ixx/iyy) are additionally boosted above the box's
+           natural values instead of using box_inertia directly. The
+           sensor puck/camera sit roughly a meter up, and a collision
+           there (driving into a desk, teleop misjudging clearance)
+           applies force at that height. A first pass at this (lower
+           mass, CoG at box center) still tipped over during testing;
+           this combines the low CoG above with higher inertia and more
+           realistic mass for AMRs this size. Yaw (izz) is left at its
+           natural value so turning stays responsive; only the tip-over
+           axes are stiffened. -->
+      <inertia ixx="6.0" ixy="0.0" ixz="0.0" iyy="8.0" iyz="0.0" izz="1.196"/>
     </inertial>
   </link>
 
@@ -287,9 +300,14 @@
        Nav2's progress checker on real goals, especially for yaw rate. One
        simple, uniform-friction contact patch removes that interference
        entirely. See README "Drivetrain design note" for the full story. -->
+  <!-- Widened from 0.85x to 0.95x chassis footprint. A wider ground
+       contact patch means the robot has to rotate further before its
+       (now much lower, see base_link inertial) CoG swings past the
+       support edge, adding margin against tipping on top of the mass/
+       inertia changes above. -->
   <link name="skid_plate_link">
     <collision>
-      <geometry><box size="${chassis_x*0.85} ${chassis_y*0.85} 0.01"/></geometry>
+      <geometry><box size="${chassis_x*0.95} ${chassis_y*0.95} 0.01"/></geometry>
     </collision>
     <inertial>
       <mass value="0.5"/>

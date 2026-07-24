@@ -81,7 +81,8 @@ def generate_launch_description():
             get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
         DeclareLaunchArgument('x', default_value='1.0'),
         DeclareLaunchArgument('y', default_value='3.3'),
-        DeclareLaunchArgument('yaw', default_value='1.5708'),
+        # Flipped 180deg from the original 1.5708 spawn yaw per user request.
+        DeclareLaunchArgument('yaw', default_value='-1.5708'),
         # The RViz-embedded "libraryBot Controls" panel (libbot_rviz_plugins)
         # is the primary control surface and is always part of the rviz
         # config below. This standalone PyQt5 window is a legacy/headless
