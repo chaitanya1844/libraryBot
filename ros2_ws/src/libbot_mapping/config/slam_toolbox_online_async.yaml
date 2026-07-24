@@ -34,7 +34,17 @@
       min_laser_range: 0.0 #for rastering images
       max_laser_range: 20.0 #for rastering images
       minimum_time_interval: 0.5
-      transform_timeout: 0.2
+      # Measured the EKF's actual odom->base_footprint update rate at
+      # only ~8.8Hz against its configured 30Hz (gzserver eating ~84% of
+      # a core on this heavy world starves its timer) -- the stock 0.2s
+      # timeout was tight enough that occasional TF lookup misses under
+      # that jitter could read as the robot having "jumped", disconnecting
+      # the current scan from the existing map region (the overlapping/
+      # duplicated map seen during testing). Widened for headroom; the
+      # real fix is reducing gzserver's load (run headless during
+      # mapping) since no amount of timeout padding fixes bad odometry
+      # accuracy, only bad odometry *timing*.
+      transform_timeout: 0.6
       tf_buffer_duration: 30.
       stack_size_to_use: 40000000 #// program needs a larger stack size to serialize large maps
       enable_interactive_mode: true
