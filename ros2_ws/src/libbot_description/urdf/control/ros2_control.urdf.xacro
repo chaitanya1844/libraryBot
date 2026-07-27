@@ -12,6 +12,17 @@
     </joint>
   </xacro:macro>
 
+  <xacro:macro name="libbot_arm_ros2_control_joint" params="name lower upper">
+    <joint name="${name}">
+      <command_interface name="position">
+        <param name="min">${lower}</param>
+        <param name="max">${upper}</param>
+      </command_interface>
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
   <ros2_control name="libbot_gazebo_system" type="system">
     <hardware>
       <plugin>gazebo_ros2_control/GazeboSystem</plugin>
@@ -20,6 +31,10 @@
     <xacro:libbot_wheel_ros2_control_joint name="front_right"/>
     <xacro:libbot_wheel_ros2_control_joint name="rear_left"/>
     <xacro:libbot_wheel_ros2_control_joint name="rear_right"/>
+    <xacro:libbot_arm_ros2_control_joint name="shoulder_pan_joint" lower="-2.0" upper="2.0"/>
+    <xacro:libbot_arm_ros2_control_joint name="shoulder_lift_joint" lower="-1.6" upper="1.2"/>
+    <xacro:libbot_arm_ros2_control_joint name="elbow_joint" lower="-2.2" upper="1.8"/>
+    <xacro:libbot_arm_ros2_control_joint name="wrist_pitch_joint" lower="-1.6" upper="1.6"/>
   </ros2_control>
 
   <gazebo>

@@ -1,0 +1,145 @@
+shelves:
+- name: BookshelfA_01_001
+  pose:
+    x: 1.405
+    y: -1.45
+    z: 0.038
+  approach_pose:
+    x: 0.678
+    y: -1.633
+    yaw: 0.2465
+- name: BookshelfA_01_002
+  pose:
+    x: 1.405
+    y: -4.762
+    z: 0.003
+  approach_pose:
+    x: 1.075
+    y: -4.088
+    yaw: -1.1143
+- name: BookshelfA_01_003
+  pose:
+    x: -2.554
+    y: -1.487
+    z: 0.006
+  approach_pose:
+    x: -1.811
+    y: -1.584
+    yaw: 3.0123
+- name: BookshelfA_01_004
+  pose:
+    x: -2.609
+    y: -4.762
+    z: 0.003
+  approach_pose:
+    x: -2.116
+    y: -4.196
+    yaw: -2.2871
+- name: BookshelfB_01_001
+  pose:
+    x: -6.19
+    y: -6.786
+    z: -0.009
+  approach_pose:
+    x: -5.607
+    y: -6.314
+    yaw: -2.4615
+- name: BookshelfB_01_002
+  pose:
+    x: -2.209
+    y: -6.971
+    z: 0.017
+  approach_pose:
+    x: -1.919
+    y: -6.28
+    yaw: -1.9686
+- name: BookshelfB_01_003
+  pose:
+    x: 0.522
+    y: -6.971
+    z: 0.018
+  approach_pose:
+    x: 0.441
+    y: -6.226
+    yaw: -1.4618
+- name: BookshelfB_01_004
+  pose:
+    x: 3.293
+    y: -6.964
+    z: 0.017
+  approach_pose:
+    x: 2.886
+    y: -6.334
+    yaw: -0.996
+- name: BookshelfB_01_005
+  pose:
+    x: 6.08
+    y: -6.988
+    z: 0.017
+  approach_pose:
+    x: 5.508
+    y: -6.504
+    yaw: -0.7016
+- name: BookshelfB_01_006
+  pose:
+    x: 7.478
+    y: -5.298
+    z: 0.017
+  approach_pose:
+    x: 6.798
+    y: -4.983
+    yaw: -0.4339
+- name: BookshelfB_01_007
+  pose:
+    x: 7.478
+    y: -2.511
+    z: 0.017
+  approach_pose:
+    x: 6.732
+    y: -2.441
+    yaw: -0.0924
+- name: BookshelfB_01_008
+  pose:
+    x: 7.478
+    y: 0.403
+    z: 0.017
+  approach_pose:
+    x: 6.759
+    y: 0.191
+    yaw: 0.2866
+- name: BookshelfC_01_001
+  pose:
+    x: 2.911
+    y: -1.31
+    z: 0.008
+  approach_pose:
+    x: 2.172
+    y: -1.436
+    yaw: 0.1689
+- name: BookshelfC_01_002
+  pose:
+    x: 2.915
+    y: -4.762
+    z: -0.003
+  approach_pose:
+    x: 2.384
+    y: -4.232
+    yaw: -0.7837
+- name: BookshelfC_01_003
+  pose:
+    x: -4.517
+    y: -1.31
+    z: 0.046
+  approach_pose:
+    x: -3.772
+    y: -1.394
+    yaw: 3.0295
+- name: BookshelfC_01_004
+  pose:
+    x: -4.614
+    y: -4.762
+    z: 0.046
+  approach_pose:
+    x: -3.984
+    y: -4.355
+    yaw: -2.5689

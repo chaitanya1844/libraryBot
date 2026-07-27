@@ -1,0 +1,192 @@
+<?xml version="1.0"?>
+<robot xmlns:xacro="http://www.ros.org/wiki/xacro">
+
+  <!-- 4-DOF pick/place arm mounted on the chassis front-top, roughly at
+       desk/book height (book props in library.world rest at ~0.75-1.05m,
+       chassis top is chassis_z=0.75m, see base.urdf.xacro). This is a
+       scripted arm (see libbot_manipulation/task_manager_node.py): joint
+       goals are a handful of canned poses (stow/reach/lift), not IK, so
+       link lengths only need to look plausible reaching across a desk in
+       front of the robot, not hit an exact point. Grasping itself is done
+       by libbot_gazebo_plugins' link attacher service, not by the
+       gripper's collision geometry, so the gripper has no moving fingers.
+       -->
+
+  <xacro:property name="arm_link_mass" value="0.4"/>
+
+  <material name="libbot_arm_grey">
+    <color rgba="0.35 0.37 0.39 1.0"/>
+  </material>
+  <material name="libbot_gripper_dark">
+    <color rgba="0.15 0.15 0.16 1.0"/>
+  </material>
+
+  <link name="arm_base_link">
+    <visual>
+      <geometry><cylinder radius="0.05" length="0.06"/></geometry>
+      <material name="libbot_arm_grey"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.05" length="0.06"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.5"/>
+      <xacro:cylinder_inertia mass="0.5" r="0.05" h="0.06"/>
+    </inertial>
+  </link>
+
+  <joint name="arm_base_joint" type="fixed">
+    <parent link="base_link"/>
+    <child link="arm_base_link"/>
+    <origin xyz="${chassis_x/2 - 0.08} 0 ${chassis_z/2 + 0.03}" rpy="0 0 0"/>
+  </joint>
+
+  <!-- shoulder_pan: yaw about the arm base -->
+  <link name="shoulder_pan_link">
+    <visual>
+      <geometry><cylinder radius="0.045" length="0.05"/></geometry>
+      <material name="libbot_arm_grey"/>
+    </visual>
+    <collision>
+      <geometry><cylinder radius="0.045" length="0.05"/></geometry>
+    </collision>
+    <inertial>
+      <mass value="0.3"/>
+      <xacro:cylinder_inertia mass="0.3" r="0.045" h="0.05"/>
+    </inertial>
+  </link>
+
+  <joint name="shoulder_pan_joint" type="revolute">
+    <parent link="arm_base_link"/>
+    <child link="shoulder_pan_link"/>
+    <origin xyz="0 0 0.045" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="-2.0" upper="2.0" effort="15.0" velocity="1.5"/>
+    <dynamics damping="0.3"/>
+  </joint>
+
+  <!-- shoulder_lift: pitch, raises/lowers the upper arm -->
+  <link name="upper_arm_link">
+    <visual>
+      <origin xyz="0.14 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.28 0.06 0.06"/></geometry>
+      <material name="libbot_arm_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.14 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.28 0.06 0.06"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.14 0 0" rpy="0 0 0"/>
+      <mass value="${arm_link_mass}"/>
+      <xacro:box_inertia mass="${arm_link_mass}" x="0.28" y="0.06" z="0.06"/>
+    </inertial>
+  </link>
+
+  <joint name="shoulder_lift_joint" type="revolute">
+    <parent link="shoulder_pan_link"/>
+    <child link="upper_arm_link"/>
+    <origin xyz="0 0 0.03" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.6" upper="1.2" effort="15.0" velocity="1.5"/>
+    <dynamics damping="0.3"/>
+  </joint>
+
+  <!-- elbow: pitch, second link segment -->
+  <link name="forearm_link">
+    <visual>
+      <origin xyz="0.13 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.26 0.05 0.05"/></geometry>
+      <material name="libbot_arm_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.13 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.26 0.05 0.05"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.13 0 0" rpy="0 0 0"/>
+      <mass value="${arm_link_mass}"/>
+      <xacro:box_inertia mass="${arm_link_mass}" x="0.26" y="0.05" z="0.05"/>
+    </inertial>
+  </link>
+
+  <joint name="elbow_joint" type="revolute">
+    <parent link="upper_arm_link"/>
+    <child link="forearm_link"/>
+    <origin xyz="0.28 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-2.2" upper="1.8" effort="10.0" velocity="1.5"/>
+    <dynamics damping="0.2"/>
+  </joint>
+
+  <!-- wrist_pitch: orients the gripper for the final approach -->
+  <link name="wrist_link">
+    <visual>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.035" length="0.06"/></geometry>
+      <material name="libbot_arm_grey"/>
+    </visual>
+    <collision>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <geometry><cylinder radius="0.035" length="0.06"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <mass value="0.2"/>
+      <xacro:cylinder_inertia mass="0.2" r="0.035" h="0.06"/>
+    </inertial>
+  </link>
+
+  <joint name="wrist_pitch_joint" type="revolute">
+    <parent link="forearm_link"/>
+    <child link="wrist_link"/>
+    <origin xyz="0.26 0 0" rpy="0 0 0"/>
+    <axis xyz="0 1 0"/>
+    <limit lower="-1.6" upper="1.6" effort="8.0" velocity="1.5"/>
+    <dynamics damping="0.2"/>
+  </joint>
+
+  <!-- gripper_link: the end effector. libbot_gazebo_plugins' link attacher
+       creates/destroys a fixed joint between this link and whatever book
+       model libbot_manipulation is currently handling, there is no real
+       finger/contact grasp, so no separate finger joints are modeled. -->
+  <link name="gripper_link">
+    <visual>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.10 0.09 0.04"/></geometry>
+      <material name="libbot_gripper_dark"/>
+    </visual>
+    <collision>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <geometry><box size="0.10 0.09 0.04"/></geometry>
+    </collision>
+    <inertial>
+      <origin xyz="0.05 0 0" rpy="0 0 0"/>
+      <mass value="0.15"/>
+      <xacro:box_inertia mass="0.15" x="0.10" y="0.09" z="0.04"/>
+    </inertial>
+  </link>
+
+  <joint name="gripper_joint" type="fixed">
+    <parent link="wrist_link"/>
+    <child link="gripper_link"/>
+    <origin xyz="0.09 0 0" rpy="0 0 0"/>
+  </joint>
+
+  <!-- Without this, Gazebo Classic's URDF->SDF conversion lumps
+       gripper_link's geometry into wrist_link (standard behavior for any
+       fixed joint) and gripper_link stops existing as its own SDF link.
+       libbot_gazebo_plugins' attach/detach services need gripper_link to
+       be addressable as a real link to weld a book to it. -->
+  <gazebo reference="gripper_link">
+    <disableFixedJointLumping>true</disableFixedJointLumping>
+  </gazebo>
+
+  <gazebo reference="arm_base_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="shoulder_pan_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="upper_arm_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="forearm_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="wrist_link"><material>Gazebo/Grey</material></gazebo>
+  <gazebo reference="gripper_link"><material>Gazebo/Black</material></gazebo>
+
+</robot>

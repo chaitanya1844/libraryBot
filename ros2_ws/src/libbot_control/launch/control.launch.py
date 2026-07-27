@@ -29,11 +29,21 @@ def generate_launch_description():
         output='screen',
     )
 
+    arm_controller_spawner = Node(
+        package='controller_manager',
+        executable='spawner',
+        arguments=['arm_controller',
+                   '--controller-manager', '/libbot/controller_manager'],
+        output='screen',
+    )
+
     # Give gazebo_ros2_control a moment to bring up the controller_manager
     # before the spawners try to call its services.
     delayed_mecanum_spawner = TimerAction(period=3.0, actions=[mecanum_drive_controller_spawner])
+    delayed_arm_spawner = TimerAction(period=3.0, actions=[arm_controller_spawner])
 
     return LaunchDescription([
         joint_state_broadcaster_spawner,
         delayed_mecanum_spawner,
+        delayed_arm_spawner,
     ])

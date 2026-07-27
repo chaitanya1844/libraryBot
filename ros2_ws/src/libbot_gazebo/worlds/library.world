@@ -9,15 +9,23 @@
     </gui>
 
     <!-- Publishes /libbot/model_states (gazebo_msgs/ModelStates) and the
-         get_entity_state/set_entity_state services. libbot_perception's
-         RFID reader node uses model_states to know how close the robot
-         is to each tagged book prop; libbot_sorting uses set_entity_state
-         to visually "place" a sorted book onto its destination shelf. -->
+         get_entity_state/set_entity_state services. libbot_manipulation's
+         task manager uses set_entity_state to rest a placed book on its
+         destination shelf pose after releasing it from the gripper. -->
     <plugin name="libbot_gazebo_ros_state" filename="libgazebo_ros_state.so">
       <ros>
         <namespace>/libbot</namespace>
       </ros>
       <update_rate>20.0</update_rate>
+    </plugin>
+
+    <!-- Arm gripper pick/place: welds gripper_link (on the libbot model)
+         to a book model's link on grasp, breaks that joint again on
+         release. See libbot_gazebo_plugins/link_attacher_plugin.cpp. -->
+    <plugin name="libbot_link_attacher" filename="liblibbot_link_attacher.so">
+      <ros>
+        <namespace>/libbot</namespace>
+      </ros>
     </plugin>
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
@@ -132,7 +140,7 @@
         <include>
             <uri>model://aws_robomaker_retail_BookE_01</uri>
         </include>
-        <pose frame="">1.170199 1.196251 343582.718718 0.002241 -0.001100 -0.623328</pose>
+        <pose frame="">1.170199 1.196251 0.948933 0.002241 -0.001100 -0.623328</pose>
 	</model>
 
 	<model name="BookE_01_010">

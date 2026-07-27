@@ -12,6 +12,7 @@
   <exec_depend>controller_manager</exec_depend>
   <exec_depend>joint_state_broadcaster</exec_depend>
   <exec_depend>mecanum_drive_controller</exec_depend>
+  <exec_depend>joint_trajectory_controller</exec_depend>
   <exec_depend>gazebo_ros2_control</exec_depend>
   <exec_depend>teleop_twist_keyboard</exec_depend>
   <exec_depend>nav2_velocity_smoother</exec_depend>
