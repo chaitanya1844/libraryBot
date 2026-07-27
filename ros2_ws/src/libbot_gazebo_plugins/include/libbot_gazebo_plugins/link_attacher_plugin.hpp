@@ -31,6 +31,19 @@ public:
   void Load(gazebo::physics::WorldPtr world, sdf::ElementPtr sdf) override;
 
 private:
+  // A dynamically created ODE "fixed" joint between two independent
+  // top-level models (the robot's gripper_link and a book) resonates
+  // into a runaway tumble within a few physics steps regardless of mass/
+  // pose fixups -- this plugin never got that stable. Following link2's
+  // pose to link1 directly every physics update (a kinematic weld) sides
+  // steps the constraint solver entirely and cannot explode.
+  struct Attachment
+  {
+    gazebo::physics::LinkPtr link1;
+    gazebo::physics::LinkPtr link2;
+    ignition::math::Pose3d relative_pose;  // link2 pose expressed in link1's frame
+  };
+
   static std::string JointKey(
     const std::string & model1, const std::string & link1,
     const std::string & model2, const std::string & link2);
@@ -43,13 +56,16 @@ private:
     const std::shared_ptr<srv::DetachLink::Request> request,
     std::shared_ptr<srv::DetachLink::Response> response);
 
+  void OnWorldUpdate();
+
   gazebo::physics::WorldPtr world_;
   gazebo_ros::Node::SharedPtr ros_node_;
   rclcpp::Service<srv::AttachLink>::SharedPtr attach_service_;
   rclcpp::Service<srv::DetachLink>::SharedPtr detach_service_;
+  gazebo::event::ConnectionPtr update_connection_;
 
   std::mutex joints_mutex_;
-  std::map<std::string, gazebo::physics::JointPtr> joints_;
+  std::map<std::string, Attachment> joints_;
 };
 
 }  // namespace libbot_gazebo_plugins

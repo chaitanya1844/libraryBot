@@ -167,20 +167,23 @@
     </inertial>
   </link>
 
-  <joint name="gripper_joint" type="fixed">
+  <!-- Zero-range revolute rather than type="fixed": Gazebo Classic's
+       URDF->SDF conversion lumps any fixed-jointed child link's geometry
+       into its parent (gripper_link would stop existing as its own SDF
+       link), and <disableFixedJointLumping> does not suppress this on the
+       sdformat version this project builds against. A revolute joint is
+       never lumped regardless, and clamping its range to [0, 0] makes it
+       behave exactly like a fixed joint. libbot_gazebo_plugins' attach/
+       detach services need gripper_link addressable as a real link to
+       weld a book to it. -->
+  <joint name="gripper_joint" type="revolute">
     <parent link="wrist_link"/>
     <child link="gripper_link"/>
     <origin xyz="0.09 0 0" rpy="0 0 0"/>
+    <axis xyz="0 0 1"/>
+    <limit lower="0" upper="0" effort="0" velocity="0"/>
+    <dynamics damping="0.0" friction="0.0"/>
   </joint>
-
-  <!-- Without this, Gazebo Classic's URDF->SDF conversion lumps
-       gripper_link's geometry into wrist_link (standard behavior for any
-       fixed joint) and gripper_link stops existing as its own SDF link.
-       libbot_gazebo_plugins' attach/detach services need gripper_link to
-       be addressable as a real link to weld a book to it. -->
-  <gazebo reference="gripper_link">
-    <disableFixedJointLumping>true</disableFixedJointLumping>
-  </gazebo>
 
   <gazebo reference="arm_base_link"><material>Gazebo/Grey</material></gazebo>
   <gazebo reference="shoulder_pan_link"><material>Gazebo/Grey</material></gazebo>
