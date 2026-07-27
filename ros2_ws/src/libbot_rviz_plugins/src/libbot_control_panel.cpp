@@ -125,8 +125,19 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   auto * mode_box = new QGroupBox("Mode (do these in order, each stops the previous one)");
   auto * mode_grid = new QGridLayout(mode_box);
 
+  auto * map_label = new QLabel("Map:");
+  map_combo_ = new QComboBox();
+  map_combo_->setToolTip(
+    "Which saved map Start Localization/Navigation use. Refreshed automatically "
+    "after Save Map, or click Refresh Maps after adding one outside this panel.");
+  auto * refresh_maps_btn = new QPushButton("Refresh Maps");
+  connect(refresh_maps_btn, &QPushButton::clicked, this, &LibbotControlPanel::onRefreshMaps);
+  mode_grid->addWidget(map_label, 0, 0);
+  mode_grid->addWidget(map_combo_, 0, 1);
+  mode_grid->addWidget(refresh_maps_btn, 0, 2);
+
   auto * step1 = new QPushButton("1. Start Mapping");
-  auto * step1b = new QPushButton("Save Map");
+  auto * step1b = new QPushButton("Save Map As...");
   auto * step2 = new QPushButton("2. Start Localization");
   auto * step3 = new QPushButton("3. Start Navigation");
   connect(step1, &QPushButton::clicked, this, &LibbotControlPanel::onStartMapping);
@@ -134,23 +145,23 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   connect(step2, &QPushButton::clicked, this, &LibbotControlPanel::onStartLocalization);
   connect(step3, &QPushButton::clicked, this, &LibbotControlPanel::onStartNavigation);
 
-  mode_grid->addWidget(step1, 0, 0);
-  mode_grid->addWidget(step1b, 0, 1);
-  mode_grid->addWidget(step2, 1, 0, 1, 2);
-  mode_grid->addWidget(step3, 2, 0, 1, 2);
+  mode_grid->addWidget(step1, 1, 0);
+  mode_grid->addWidget(step1b, 1, 1, 1, 2);
+  mode_grid->addWidget(step2, 2, 0, 1, 3);
+  mode_grid->addWidget(step3, 3, 0, 1, 3);
 
   auto * mode_help = new QLabel(
     "<small>1. Start Mapping, then drive around with the Xbox controller "
     "(<code>ros2 launch libbot_control teleop_joy.launch.py</code>, hold LB) "
-    "until the map looks complete in RViz, then Save Map.<br>"
-    "2. Start Localization to load the saved map and locate the robot on "
-    "it via FAST-LIO2 (3D lidar-inertial odometry) -- enable the "
+    "until the map looks complete in RViz, then Save Map As... (pick a name).<br>"
+    "2. Pick a map above, then Start Localization to load it and locate the "
+    "robot on it via FAST-LIO2 (3D lidar-inertial odometry) -- enable the "
     "FastLioCloud/FastLioPath displays in RViz to check it's tracking.<br>"
     "3. Start Navigation to bring up Nav2. Then use RViz's own "
     "\"2D Pose Estimate\" tool to set where the robot starts and "
     "\"Nav2 Goal\" to send it anywhere on the map.</small>");
   mode_help->setWordWrap(true);
-  mode_grid->addWidget(mode_help, 3, 0, 1, 2);
+  mode_grid->addWidget(mode_help, 4, 0, 1, 3);
 
   root->addWidget(mode_box);
 
@@ -200,6 +211,7 @@ void LibbotControlPanel::onInitialize()
   connect(ui_timer_, &QTimer::timeout, this, &LibbotControlPanel::onUiTimer);
   ui_timer_->start(300);
 
+  onRefreshMaps();
   log("Panel initialized");
 }
 
@@ -383,9 +395,14 @@ void LibbotControlPanel::onStartMapping()
 
 void LibbotControlPanel::onStartLocalization()
 {
-  QString map_path = QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml";
-  QProcess::startDetached("bash", {"-c", switchModeScript() + " localization " + map_path});
-  log("Stopping mapping, starting localization (FAST-LIO2) against the saved map...");
+  QString map_path = selectedMapYamlPath();
+  if (map_path.isEmpty()) {
+    log("No map selected -- pick one from the Map dropdown (or Save Map As... first)");
+    return;
+  }
+  QProcess::startDetached("bash", {"-c", switchModeScript() + " localization \"" + map_path + "\""});
+  log("Stopping mapping, starting localization (FAST-LIO2) against '" +
+      map_combo_->currentText() + "'...");
 }
 
 void LibbotControlPanel::onStartNavigation()
@@ -396,10 +413,75 @@ void LibbotControlPanel::onStartNavigation()
 
 void LibbotControlPanel::onSaveMap()
 {
-  QProcess::startDetached(
-    "ros2", {"run", "nav2_map_server", "map_saver_cli", "-f",
-      QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/maps/library"});
-  log("Saving map...");
+  bool ok = false;
+  QString name = QInputDialog::getText(
+    this, "Save Map As", "Map name (no extension):", QLineEdit::Normal, "library", &ok);
+  if (!ok) {
+    return;
+  }
+  name = name.trimmed();
+  if (name.isEmpty()) {
+    log("Save Map cancelled: name was empty");
+    return;
+  }
+  static const QRegularExpression valid_name("^[A-Za-z0-9_-]+$");
+  if (!valid_name.match(name).hasMatch()) {
+    log("Save Map cancelled: name must be letters/numbers/underscore/hyphen only "
+        "(no spaces or slashes) -- got '" + name + "'");
+    return;
+  }
+  QString dest = mapsDir() + "/" + name;
+  if (QFile::exists(dest + ".yaml")) {
+    auto reply = QMessageBox::question(
+      this, "Overwrite Map?", "'" + name + "' already exists. Overwrite it?",
+      QMessageBox::Yes | QMessageBox::No);
+    if (reply != QMessageBox::Yes) {
+      log("Save Map cancelled: '" + name + "' already exists");
+      return;
+    }
+  }
+  QProcess::startDetached("ros2", {"run", "nav2_map_server", "map_saver_cli", "-f", dest});
+  log("Saving map as '" + name + "'...");
+  // map_saver_cli runs detached (fire-and-forget, matches the rest of this
+  // panel's process launches); give it a moment to actually write the
+  // files before refreshing the dropdown, then select what was just saved.
+  QTimer::singleShot(1500, this, [this, name]() {
+    onRefreshMaps();
+    int idx = map_combo_->findText(name);
+    if (idx >= 0) {
+      map_combo_->setCurrentIndex(idx);
+    }
+  });
+}
+
+void LibbotControlPanel::onRefreshMaps()
+{
+  QString current = map_combo_->currentText();
+  map_combo_->clear();
+  QDir dir(mapsDir());
+  QStringList yaml_files = dir.entryList({"*.yaml"}, QDir::Files, QDir::Name);
+  for (const QString & f : yaml_files) {
+    map_combo_->addItem(f.left(f.length() - QString(".yaml").length()));
+  }
+  if (map_combo_->count() == 0) {
+    log("No saved maps found in " + mapsDir());
+    return;
+  }
+  int idx = map_combo_->findText(current);
+  map_combo_->setCurrentIndex(idx >= 0 ? idx : 0);
+}
+
+QString LibbotControlPanel::mapsDir() const
+{
+  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/maps";
+}
+
+QString LibbotControlPanel::selectedMapYamlPath() const
+{
+  if (!map_combo_ || map_combo_->currentText().isEmpty()) {
+    return QString();
+  }
+  return mapsDir() + "/" + map_combo_->currentText() + ".yaml";
 }
 
 void LibbotControlPanel::log(const QString & text)

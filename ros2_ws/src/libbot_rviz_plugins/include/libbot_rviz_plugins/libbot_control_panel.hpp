@@ -2,6 +2,7 @@
 #define LIBBOT_RVIZ_PLUGINS__LIBBOT_CONTROL_PANEL_HPP_
 
 #include <QtWidgets>
+#include <QRegularExpression>
 #undef NO_ERROR
 
 #include <memory>
@@ -53,6 +54,7 @@ private Q_SLOTS:
   void onStartNavigation();
   void onSaveMap();
   void onOpenCameraView();
+  void onRefreshMaps();
   void onSpinTimer();
   void onUiTimer();
 
@@ -60,6 +62,8 @@ private:
   void setEStop(bool engaged);
   void setTeleopButtonsEnabled(bool enabled);
   void log(const QString & text);
+  QString mapsDir() const;
+  QString selectedMapYamlPath() const;
 
   rclcpp::Node::SharedPtr node_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
@@ -80,6 +84,9 @@ private:
 
   // status
   QLabel * pose_label_{nullptr};
+
+  // map selection (localization/navigation) + save-as name
+  QComboBox * map_combo_{nullptr};
 
   // manual drive
   QPushButton * estop_button_{nullptr};
