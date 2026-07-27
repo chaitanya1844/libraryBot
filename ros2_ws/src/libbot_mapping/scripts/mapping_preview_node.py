@@ -14,13 +14,26 @@ has something to show *while* mapping -- a live preview, not a
 replacement for pcd_to_2d_map.py's final output (which also gets to use
 the full, unthrottled point cloud rather than whatever's arrived by
 each preview tick).
+
+/Laser_map is published in FAST-LIO2's own "camera_init" frame, NOT
+"map" -- fastlio_map_odom_bridge.py solves a real (usually non-identity)
+map -> camera_init offset (translation *and* rotation), so this must
+actually transform each point into "map" frame before gridding it, not
+just relabel the raw camera_init-frame coordinates as if they were
+already map-frame (which only ever looked right by coincidence, back
+when that offset happened to be identity).
 """
 import numpy as np
 import rclpy
+from rclpy.duration import Duration
 from rclpy.node import Node
+from rclpy.time import Time
+from scipy.spatial.transform import Rotation
 from sensor_msgs.msg import PointCloud2
 from sensor_msgs_py import point_cloud2
 from nav_msgs.msg import OccupancyGrid
+from tf2_ros.buffer import Buffer
+from tf2_ros.transform_listener import TransformListener
 
 
 class MappingPreviewNode(Node):
@@ -43,6 +56,8 @@ class MappingPreviewNode(Node):
         self._frame_id = self.get_parameter('frame_id').value
 
         self._latest_cloud = None
+        self._tf_buffer = Buffer()
+        self._tf_listener = TransformListener(self._tf_buffer, self)
         self._pub = self.create_publisher(
             OccupancyGrid, self.get_parameter('output_topic').value, 1)
         self.create_subscription(
@@ -66,6 +81,20 @@ class MappingPreviewNode(Node):
             self._latest_cloud, field_names=('x', 'y', 'z'), skip_nans=True)
         if pts.shape[0] == 0:
             return
+
+        try:
+            t = self._tf_buffer.lookup_transform(
+                self._frame_id, self._latest_cloud.header.frame_id, Time(),
+                timeout=Duration(seconds=0.2))
+        except Exception as exc:
+            self.get_logger().warn(
+                'no %s -> %s yet: %s' % (self._frame_id, self._latest_cloud.header.frame_id, exc),
+                throttle_duration_sec=2.0)
+            return
+        tr = t.transform.translation
+        rot = t.transform.rotation
+        R = Rotation.from_quat([rot.x, rot.y, rot.z, rot.w]).as_matrix()
+        pts = pts @ R.T + np.array([tr.x, tr.y, tr.z])
 
         band = pts[(pts[:, 2] >= self._z_min) & (pts[:, 2] <= self._z_max)]
         if band.shape[0] == 0:
