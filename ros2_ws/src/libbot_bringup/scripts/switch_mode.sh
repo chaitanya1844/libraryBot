@@ -13,7 +13,7 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml}"
 # Everything that could own map->odom, plus the full Nav2 autonomy stack
 # that sits on top of localization. Matches the same process-name
 # patterns used throughout this repo's own testing/cleanup.
-STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge"
+STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher"
 
 # FAST-LIO2 replaced AMCL as the localization source (see
 # libbot_localization/launch/localization_fastlio.launch.py) -- it lives
