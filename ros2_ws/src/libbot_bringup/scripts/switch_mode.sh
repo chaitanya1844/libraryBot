@@ -35,7 +35,22 @@ case "$MODE" in
   localization)
     stop_stack
     if [ -f "$FASTLIO_WS_SETUP" ]; then
+      # colcon-generated setup scripts reference $COLCON_TRACE without a
+      # default and abort under `set -u` ("unbound variable") -- this
+      # silently killed the whole script before it ever reached the
+      # `ros2 launch` below, with no error visible anywhere except this
+      # script's own stderr (which QProcess::startDetached from the
+      # panel discards). Relax nounset only around the source calls.
+      set +u
       source "$FASTLIO_WS_SETUP"
+      # fastlio_ws's own setup.bash chains back to whatever *other*
+      # overlay workspaces were sourced on this machine when it was
+      # built (unrelated other robot projects), not this repo's own
+      # ros2_ws -- re-source libraryBot's install on top so it's the
+      # highest-priority overlay again, regardless of what fastlio_ws's
+      # own chain pulled in.
+      source "$HOME/libraryBot/ros2_ws/install/setup.bash"
+      set -u
     else
       echo "switch_mode.sh: $FASTLIO_WS_SETUP not found -- see README '3D localization' to build it" >&2
     fi
