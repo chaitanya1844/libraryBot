@@ -24,6 +24,12 @@
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>python3-scipy</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>sensor_msgs_py</exec_depend>
+  <!-- Open3D (ICP against a saved PCD map, fastlio_map_odom_bridge.py's
+       pcd_map_path option) has no rosdep key, install via
+       "pip install open3d". Already present on this dev machine. Also
+       used by libbot_mapping/scripts/pcd_to_2d_map.py. -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

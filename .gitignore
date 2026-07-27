@@ -14,3 +14,8 @@ __pycache__/
 .vscode/
 *.swp
 .DS_Store
+
+# FAST-LIO2 PCD maps (large binary, machine/run-specific -- generate with
+# `ros2 service call /map_save std_srvs/srv/Trigger`, see
+# libbot_mapping/launch/mapping.launch.py)
+ros2_ws/src/libbot_mapping/pcd_maps/*.pcd

@@ -1,10 +1,9 @@
 # robot_localization EKF: fuses the planar_move plugin's kinematic
 # odometry (/libbot/planar_odom) with the IMU to publish a smoothed
-# odom -> base_footprint TF. AMCL (see amcl.yaml) separately owns
-# map -> odom; slam_toolbox owns map -> odom instead while mapping.
-# Only one of {AMCL, slam_toolbox} should run at a time (see
-# libbot_bringup README section "Switching between mapping and
-# navigation mode").
+# odom -> base_footprint TF. FAST-LIO2 separately owns map -> odom
+# while localizing (fastlio_map_odom_bridge.py); while mapping, nothing
+# owns map -> odom at all (FAST-LIO2 publishes map -> camera_init ->
+# body instead). Only one mode runs at a time -- see switch_mode.sh.
 /**:
   ekf_filter_node:
     ros__parameters:

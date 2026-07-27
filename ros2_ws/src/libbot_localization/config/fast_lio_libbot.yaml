@@ -7,7 +7,16 @@
         filter_size_map: 0.5
         cube_side_length: 1000.0
         runtime_pos_log_enable: false
-        map_file_path: "libbot_library.pcd"
+        # Absolute path written by the `/map_save` service (std_srvs/Trigger),
+        # NOT by SIGINT/Ctrl-C: this ROS2 port's shutdown-time save only
+        # writes a hardcoded path inside the source tree
+        # (~/fastlio_ws/src/FAST_LIO/PCD/scans.pcd), ignoring this
+        # parameter entirely. Call `ros2 service call /map_save
+        # std_srvs/srv/Trigger` after driving around. Always the same
+        # name (last mapping run wins); run pcd_to_2d_map.py against it
+        # and/or copy it elsewhere before starting a new mapping run if
+        # you want to keep more than one.
+        map_file_path: "/home/sychic/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
 
         common:
             lid_topic:  "/libbot/lidar_3d/points_velodyne"
@@ -45,6 +54,13 @@
             scan_publish_en: true
             dense_publish_en: true
             scan_bodyframe_pub_en: true
+            # Required for /map_save to have anything to write: it saves
+            # pcl_wait_pub, which is *only* ever appended to inside
+            # publish_map() (laserMapping.cpp), gated on this flag. Left
+            # false (the fast_lio default), pcl_wait_pub stays empty
+            # forever and /map_save's PCDWriter throws
+            # "Input point cloud has no data!" and crashes the node.
+            map_en: true
 
         pcd_save:
             pcd_save_en: true

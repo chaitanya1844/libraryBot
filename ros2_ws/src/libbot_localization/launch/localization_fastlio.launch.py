@@ -7,10 +7,14 @@ regardless of what provides localization) and a lifecycle manager for
 it, plus the same 3D lidar Velodyne-format adapter + FAST-LIO2
 `fastlio_mapping` node as `localization_3d.launch.py`, plus
 `fastlio_map_odom_bridge` to turn FAST-LIO2's own pose estimate into the
-`map -> odom` transform Nav2 actually looks for (see that node's
-docstring for the exact math and the assumption it relies on: FAST-LIO2
-must initialize at the same pose the map/spawn convention already
-assumes, same as AMCL's `initial_pose` in `amcl.yaml` had to).
+`map -> odom` transform Nav2 actually looks for.
+
+Pass `pcd_map_path` (a PCD saved by a previous fastlio_mapping run, see
+pcd_to_2d_map.py's docstring for how that PCD also becomes the `map`
+arg's 2D yaml/pgm) to have the bridge continuously correct itself via
+ICP against that map, instead of relying only on a single "2D Pose
+Estimate" click in RViz -- see fastlio_map_odom_bridge.py's docstring
+for the full explanation.
 
 Requires the separate ~/fastlio_ws overlay sourced first, same as
 localization_3d.launch.py:
@@ -18,7 +22,8 @@ localization_3d.launch.py:
     source /opt/ros/humble/setup.bash
     source ~/fastlio_ws/install/setup.bash
     source ~/libraryBot/ros2_ws/install/setup.bash
-    ros2 launch libbot_localization localization_fastlio.launch.py
+    ros2 launch libbot_localization localization_fastlio.launch.py \\
+        map:=/path/to/name.yaml pcd_map_path:=/path/to/name.pcd
 """
 import os
 
@@ -33,11 +38,15 @@ from launch_ros.actions import Node
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     map_yaml = LaunchConfiguration('map')
+    pcd_map_path = LaunchConfiguration('pcd_map_path')
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('map', default_value=os.path.join(
             get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
+        DeclareLaunchArgument('pcd_map_path', default_value='',
+                               description='PCD map for continuous ICP correction. Empty = '
+                                            'rely on a single RViz "2D Pose Estimate" click instead.'),
 
         Node(
             package='nav2_map_server',
@@ -72,6 +81,6 @@ def generate_launch_description():
             executable='fastlio_map_odom_bridge.py',
             name='fastlio_map_odom_bridge',
             output='screen',
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{'use_sim_time': use_sim_time, 'pcd_map_path': pcd_map_path}],
         ),
     ])

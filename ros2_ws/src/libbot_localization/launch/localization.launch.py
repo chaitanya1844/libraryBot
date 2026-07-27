@@ -5,7 +5,9 @@ TF ownership:
     EKF (this launch)      : odom -> base_footprint
     FAST-LIO2 (if enabled)  : map -> odom, via fastlio_map_odom_bridge
                               (see localization_fastlio.launch.py)
-    slam_toolbox (mapping) : map -> odom   (mutually exclusive with the above)
+    FAST-LIO2 (mapping)    : map -> camera_init -> body, no map -> odom
+                              at all (see libbot_mapping/mapping.launch.py) --
+                              mutually exclusive with the above regardless
 
 `use_amcl` is a legacy name kept for backward compatibility with
 existing callers (simulation.launch.py, switch_mode.sh) -- it no longer
@@ -41,7 +43,8 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('use_amcl', default_value='false',
                                description='Localize against a saved map with FAST-LIO2. '
-                                            'Leave false while mapping with slam_toolbox.'),
+                                            'Leave false while mapping (libbot_mapping '
+                                            'mapping.launch.py).'),
         DeclareLaunchArgument('map', default_value=os.path.join(
             get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
         DeclareLaunchArgument('ekf_config', default_value=os.path.join(pkg_share, 'config', 'ekf.yaml')),

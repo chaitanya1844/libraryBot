@@ -38,11 +38,11 @@ def generate_launch_description():
             parameters=[config],
             remappings=[
                 ('cloud_in', '/libbot/lidar_3d/points_filtered'),
-                # global /scan, not /libbot/scan: slam_toolbox publishes its
-                # output map on a hardcoded absolute "/map" regardless of
-                # node namespace, so the whole nav stack (AMCL, slam_toolbox,
-                # Nav2) is kept un-namespaced here to match that convention
-                # and avoid partially-namespaced topic confusion.
+                # global /scan, not /libbot/scan: map_server/Nav2 publish
+                # and consume "/map" as a hardcoded absolute topic
+                # regardless of node namespace, so the whole nav stack is
+                # kept un-namespaced here to match that convention and
+                # avoid partially-namespaced topic confusion.
                 ('scan', '/scan'),
             ],
         ),

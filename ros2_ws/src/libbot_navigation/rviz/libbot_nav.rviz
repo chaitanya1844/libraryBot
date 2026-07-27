@@ -82,8 +82,8 @@ Visualization Manager:
         Durability Policy: Volatile
       Size (m): 0.035
       Style: Flat Squares
-      Color Transformer: AxisColor
-      Axis: Z
+      Color Transformer: FlatColor
+      Color: 255; 0; 0
       Autocompute Value Bounds: true
       Use Fixed Frame: true
       Enabled: true
@@ -134,8 +134,8 @@ Visualization Manager:
         Durability Policy: Volatile
       Size (m): 0.02
       Style: Flat Squares
-      Color Transformer: AxisColor
-      Axis: Z
+      Color Transformer: FlatColor
+      Color: 255; 255; 0
       Enabled: true
 
     - Class: rviz_default_plugins/Path

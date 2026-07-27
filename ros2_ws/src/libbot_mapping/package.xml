@@ -9,8 +9,16 @@
 
   <buildtool_depend>ament_cmake</buildtool_depend>
 
-  <exec_depend>slam_toolbox</exec_depend>
   <exec_depend>nav2_map_server</exec_depend>
+  <!-- mapping.launch.py includes libbot_localization's FAST-LIO2 3D
+       mapping launch at runtime (slam_toolbox was the pre-FAST-LIO2
+       mapping source; removed, both would fight over map -> odom). Not
+       declared as an exec_depend: libbot_localization already depends
+       on libbot_mapping (for the maps/ dir + pcd_to_2d_map.py output),
+       and colcon refuses to order a circular package dependency. -->
+  <!-- scripts/pcd_to_2d_map.py: Open3D has no rosdep key, `pip install
+       open3d`; PyYAML is python3-yaml. -->
+  <exec_depend>python3-yaml</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

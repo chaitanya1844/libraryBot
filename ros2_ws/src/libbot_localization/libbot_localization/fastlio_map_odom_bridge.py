@@ -15,41 +15,41 @@ own body pose estimate.
 
 FAST-LIO2 publishes its estimate on /Odometry as a pose in its own
 "camera_init" frame -- wherever the robot happened to be when
-fastlio_mapping started, *not* necessarily the 2D map's origin. If you
-drove around during a mapping run and then start localization from
-wherever you ended up (the common case -- there's no reason to drive
-back to the exact original spawn point first), camera_init and the 2D
-map's true origin are two different points, and treating them as
-coincident (this bridge's original behavior) makes the 3D cloud and the
-2D map disagree by exactly that offset -- FastLioCloud/FastLioPath
-visibly not lining up with the Map display, and Nav2 planning against a
-map that doesn't match where FAST-LIO2 thinks the robot actually is.
+fastlio_mapping started, *not* necessarily the 2D map's origin. Two ways
+this node solves for the actual offset between "map" and "camera_init":
 
-Fix: same tool AMCL used for the same problem. Publish a "2D Pose
-Estimate" in RViz once, at the robot's actual current position on the
-map, right after starting localization. This bridge listens on
-/initialpose and uses it to solve for the one-time offset between
-"map" and FAST-LIO2's "camera_init":
+1. **ICP against a saved PCD map** (set the `pcd_map_path` parameter --
+   see pcd_to_2d_map.py for turning that same PCD into the 2D map Nav2's
+   costmaps use). Every `icp_period_sec`, the latest body-frame scan
+   (/cloud_registered_body) is transformed into the current best "map"
+   guess and registered against the saved map with Open3D point-to-point
+   ICP; a good-fitness result corrects `map -> camera_init` right then.
+   This is the real fix -- continuous, self-correcting, matches how
+   FAST-LIO-LOCALIZATION (github hku-mars ecosystem, ROS1/Python2 only,
+   not usable here directly) fuses a low-rate global correction with
+   FAST-LIO's own high-rate odometry.
+2. **One-shot from RViz's "2D Pose Estimate"** (always available, no PCD
+   needed): publishes once on /initialpose, solves
+   `map -> camera_init = (map -> true_body_now) * inverse(camera_init -> body_now)`
+   and holds it fixed. Good enough with no drift, or as the initial seed
+   ICP refines from afterward, or as a manual correction if ICP ever
+   drifts/loses track.
 
-    map -> camera_init  =  (map -> true_body_now) * inverse(camera_init -> body_now)
-
-held fixed from then on (camera_init doesn't drift once FAST-LIO2 has
-initialized, so this offset doesn't need to be recomputed). Every
-subsequent /Odometry sample is composed through that fixed offset
-before being used to correct map->odom. Before any /initialpose is
-received, the offset defaults to identity -- correct only if the robot
-happens to already be sitting at the map's origin pose, same caveat the
-old spawn-coincidence assumption had.
+Before either has run, the offset defaults to identity -- correct only
+if the robot happens to already be sitting at the map's origin pose.
 
 Run this instead of AMCL (nav2_amcl), alongside map_server (still needed
 to serve the static map for Nav2's costmaps) and FAST-LIO2 itself -- see
 localization_fastlio.launch.py.
 """
 import numpy as np
+import open3d as o3d
 import rclpy
 from rclpy.node import Node
 from rclpy.time import Time
 from scipy.spatial.transform import Rotation
+from sensor_msgs.msg import PointCloud2
+from sensor_msgs_py import point_cloud2
 from geometry_msgs.msg import PoseWithCovarianceStamped, TransformStamped
 from nav_msgs.msg import Odometry
 from tf2_ros import TransformBroadcaster
@@ -85,6 +85,10 @@ class FastLioMapOdomBridge(Node):
         super().__init__('fastlio_map_odom_bridge')
         self.declare_parameter('odom_frame', 'odom')
         self.declare_parameter('base_frame', 'base_footprint')
+        self.declare_parameter('pcd_map_path', '')
+        self.declare_parameter('icp_period_sec', 2.0)
+        self.declare_parameter('icp_max_correspondence_distance', 1.0)
+        self.declare_parameter('icp_min_fitness', 0.3)
         self._odom_frame = self.get_parameter('odom_frame').value
         self._base_frame = self.get_parameter('base_frame').value
 
@@ -92,18 +96,41 @@ class FastLioMapOdomBridge(Node):
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._broadcaster = TransformBroadcaster(self)
 
-        # map -> camera_init, solved for once an /initialpose arrives (see
-        # _on_initial_pose); identity until then.
+        # map -> camera_init, solved for by ICP and/or /initialpose (see
+        # _run_icp / _on_initial_pose); identity until either has run.
         self._map_to_camera_init = np.eye(4)
         self._latest_camera_init_to_body = None
+        self._latest_body_scan = None
 
         self.create_subscription(Odometry, '/Odometry', self._on_odometry, 20)
         self.create_subscription(
             PoseWithCovarianceStamped, '/initialpose', self._on_initial_pose, 10)
+
+        pcd_map_path = self.get_parameter('pcd_map_path').value
+        self._target_map = None
+        if pcd_map_path:
+            self._target_map = o3d.io.read_point_cloud(pcd_map_path)
+            self._target_map = self._target_map.voxel_down_sample(0.1)
+            if len(self._target_map.points) == 0:
+                self.get_logger().error(
+                    f"'{pcd_map_path}' loaded but has 0 points -- ICP correction disabled. "
+                    "Was it saved via `ros2 service call /map_save std_srvs/srv/Trigger`, "
+                    'with `publish.map_en: true` set in fast_lio_libbot.yaml? SIGINT/Ctrl-C '
+                    "doesn't write this path at all in this ROS2 port.")
+                self._target_map = None
+            else:
+                self.get_logger().info(
+                    f"Loaded ICP target map '{pcd_map_path}' "
+                    f'({len(self._target_map.points)} points after downsampling)')
+                self.create_subscription(
+                    PointCloud2, '/cloud_registered_body', self._on_body_scan, 5)
+                self.create_timer(self.get_parameter('icp_period_sec').value, self._run_icp)
+
         self.get_logger().info(
             'fastlio_map_odom_bridge ready -- publishing map->%s from /Odometry. '
             'Use RViz\'s "2D Pose Estimate" once to align the 3D map with the 2D '
-            'one if they were started from different poses.' % self._odom_frame)
+            'one if they were started from different poses%s.'
+            % (self._odom_frame, ', or let ICP correct it automatically' if self._target_map else ''))
 
     def _on_initial_pose(self, msg: PoseWithCovarianceStamped):
         if self._latest_camera_init_to_body is None:
@@ -114,6 +141,45 @@ class FastLioMapOdomBridge(Node):
         map_to_true_body = pose_to_matrix(msg.pose.pose.position, msg.pose.pose.orientation)
         self._map_to_camera_init = map_to_true_body @ np.linalg.inv(self._latest_camera_init_to_body)
         self.get_logger().info('Re-aligned map<->camera_init from 2D Pose Estimate')
+
+    def _on_body_scan(self, msg: PointCloud2):
+        self._latest_body_scan = msg
+
+    def _run_icp(self):
+        if self._latest_body_scan is None or self._latest_camera_init_to_body is None:
+            return
+
+        pts = point_cloud2.read_points_numpy(
+            self._latest_body_scan, field_names=('x', 'y', 'z'), skip_nans=True)
+        if pts.shape[0] < 30:
+            return
+
+        source = o3d.geometry.PointCloud()
+        source.points = o3d.utility.Vector3dVector(pts.astype(np.float64))
+
+        # Transform the body-frame scan into the current best guess at
+        # "map" frame; ICP then only has to correct the *residual* error
+        # in that guess, not register from scratch each time.
+        guess = self._map_to_camera_init @ self._latest_camera_init_to_body
+        source.transform(guess)
+
+        result = o3d.pipelines.registration.registration_icp(
+            source, self._target_map,
+            self.get_parameter('icp_max_correspondence_distance').value,
+            np.eye(4),
+            o3d.pipelines.registration.TransformationEstimationPointToPoint())
+
+        if result.fitness < self.get_parameter('icp_min_fitness').value:
+            self.get_logger().warn(
+                f'ICP fitness {result.fitness:.2f} too low, skipping this correction',
+                throttle_duration_sec=5.0)
+            return
+
+        corrected_guess = result.transformation @ guess
+        self._map_to_camera_init = corrected_guess @ np.linalg.inv(self._latest_camera_init_to_body)
+        self.get_logger().info(
+            f'ICP correction applied (fitness={result.fitness:.2f}, rmse={result.inlier_rmse:.3f}m)',
+            throttle_duration_sec=5.0)
 
     def _on_odometry(self, msg: Odometry):
         self._latest_camera_init_to_body = pose_to_matrix(
