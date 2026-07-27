@@ -63,6 +63,7 @@ private Q_SLOTS:
   void onSaveMap();
   void onDeleteMap();
   void onMoveArm();
+  void onResetArm();
   void onRefreshMaps();
   void onSpinTimer();
   void onUiTimer();

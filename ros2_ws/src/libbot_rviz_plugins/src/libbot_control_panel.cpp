@@ -135,8 +135,11 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
     arm_sliders_[i] = slider;
   }
   auto * arm_move_btn = new QPushButton("Move Arm");
+  auto * arm_reset_btn = new QPushButton("Reset to Default");
   connect(arm_move_btn, &QPushButton::clicked, this, &LibbotControlPanel::onMoveArm);
+  connect(arm_reset_btn, &QPushButton::clicked, this, &LibbotControlPanel::onResetArm);
   arm_grid->addWidget(arm_move_btn, 4, 0, 1, 3);
+  arm_grid->addWidget(arm_reset_btn, 5, 0, 1, 3);
   root->addWidget(arm_box);
 
   // ---------------- mode: Map -> Localize -> Navigate ----------------
@@ -458,6 +461,16 @@ void LibbotControlPanel::onMoveArm()
   goal.trajectory.points.push_back(point);
   arm_action_client_->async_send_goal(goal);
   log("Arm moving...");
+}
+
+void LibbotControlPanel::onResetArm()
+{
+  // Same stow pose as arm_stow_node.py's POSE_STOW.
+  static const double kDefaultPose[4] = {0.0, -1.4, 1.6, 0.4};
+  for (int i = 0; i < 4; ++i) {
+    arm_sliders_[i]->setValue(static_cast<int>(kDefaultPose[i] * 1000));
+  }
+  onMoveArm();
 }
 
 void LibbotControlPanel::onStartMapping()
