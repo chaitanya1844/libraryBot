@@ -103,8 +103,8 @@ Visualization Manager:
       Size (m): 0.02
       Style: Flat Squares
       Color Transformer: FlatColor
-      Color: 120; 40; 40
-      Alpha: 0.5
+      Color: 220; 90; 60
+      Alpha: 0.85
       Autocompute Value Bounds: true
       Use Fixed Frame: true
       Enabled: true

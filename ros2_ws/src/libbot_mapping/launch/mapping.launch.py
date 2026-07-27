@@ -36,16 +36,23 @@ Then localize against both with:
     ros2 launch libbot_localization localization_fastlio.launch.py \\
         map:=/path/to/my_map_name.yaml pcd_map_path:=/path/to/latest.pcd
 
-RViz's Fixed Frame is "map" (so it still works once you switch to
-localization, where fastlio_map_odom_bridge solves the real map ->
-camera_init offset) -- but nothing publishes "map" at all during
-mapping itself, since that bridge node only runs in localization mode.
-Without it, RViz can't resolve *any* transform and renders nothing.
-This mapping run is what *defines* the map, so map == both odom's and
-camera_init's origin here is exactly right, not just a placeholder --
-broadcast both as identity so RViz can resolve the live point cloud
-(under camera_init) and the robot model (under odom -> base_footprint,
-a separate branch FAST-LIO2 knows nothing about) while mapping.
+RViz's Fixed Frame is "map", but nothing publishes it at all during
+mapping unless we run something here too -- without it, RViz can't
+resolve any transform and renders nothing. This run is what *defines*
+the map, so map == camera_init's origin is correct (fastlio_map_odom_bridge
+with no pcd_map_path leaves that offset at identity, same as
+localization before its first correction). But map -> odom must NOT
+also be identity: odom's origin is the robot's *spawn* pose, while
+camera_init's origin is wherever the robot was when fastlio_mapping
+itself started -- if you'd driven at all before clicking "Start
+Mapping", those two are already offset, and blindly identity-transforming
+both under "map" (an earlier version of this file did exactly that)
+makes RobotModel (on the odom branch) and FastLioCloud/FastLioPath (on
+the camera_init branch) render in two different, unaligned places.
+fastlio_map_odom_bridge already computes map -> odom correctly from the
+*actual* live camera_init -> body and odom -> base transforms (see its
+own docstring) -- reusing it here instead of a second blind identity
+transform is what actually fixes that.
 
 Also runs mapping_preview_node.py: FAST-LIO2 has no live 2D map the way
 slam_toolbox used to show one (the real 2D map only exists once,
@@ -72,19 +79,10 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
 
         Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='map_to_camera_init',
+            package='libbot_localization',
+            executable='fastlio_map_odom_bridge.py',
+            name='fastlio_map_odom_bridge',
             output='screen',
-            arguments=['0', '0', '0', '0', '0', '0', 'map', 'camera_init'],
-            parameters=[{'use_sim_time': use_sim_time}],
-        ),
-        Node(
-            package='tf2_ros',
-            executable='static_transform_publisher',
-            name='map_to_odom',
-            output='screen',
-            arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
             parameters=[{'use_sim_time': use_sim_time}],
         ),
 
