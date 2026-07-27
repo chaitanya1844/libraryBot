@@ -32,6 +32,7 @@ ros2_ws/src/
 ├── libbot_control           mecanum_drive_controller + arm_controller + joint_state_broadcaster (ros2_control) config/launch
 ├── libbot_manipulation      book_catalog.yaml, shelf_catalog.yaml, the Nav2+arm task manager (task_manager_node.py)
 ├── libbot_localization      robot_localization EKF + FAST-LIO2 (3D lidar-inertial) localization config/launch
+├── fast_lio_localization    Vendored ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION -- ICP relocalization against a saved PCD
 ├── libbot_mapping           FAST-LIO2 mapping launch, PCD->2D map converter, saved maps/PCDs
 ├── libbot_navigation        Nav2 params (holonomic DWB tuning) + launch + RViz config
 ├── libbot_perception        Lidar->2D scan, 3D-lidar-to-Velodyne-format adapter (for FAST-LIO2), self-hit filtering
@@ -48,6 +49,7 @@ ros2_ws/src/
 - `ros-humble-robot-localization`, `ros-humble-realsense2-description`, `ros-humble-pointcloud-to-laserscan`
 - `ros-humble-mecanum-drive-controller` (needs a `ros2_controllers` build that includes it)
 - `python3-pyqt5`, `python3-opencv`, `ros-humble-cv-bridge`, `python3-yaml`, `python3-open3d` (`pip install open3d`)
+- `pip install tf_transformations ros2_numpy` (fast_lio_localization's relocalization ICP)
 - FAST-LIO2: separate overlay workspace, see "3D mapping/localization (FAST-LIO2)" below
 
 ## Build
@@ -105,13 +107,16 @@ ros2 run libbot_mapping pcd_to_2d_map.py ~/libraryBot/ros2_ws/src/libbot_mapping
 ```
 Writes `my_map_name.yaml`/`.pgm` into `libbot_mapping/maps/`. Then
 `switch_mode.sh localization ~/libraryBot/ros2_ws/src/libbot_mapping/maps/my_map_name.yaml`
--- this also always points `pcd_map_path` at the same `latest.pcd` for
-continuous ICP correction. FAST-LIO2 itself has no "localize against a
-prior map" mode -- it always runs live SLAM from scratch on startup, so
-its own point cloud (FastLioCloud/yellow in RViz) keeps growing
-regardless of mode; ICP is what keeps that fresh session's frame aligned
-with the map you actually saved, instead of just a one-shot guess at
-startup.
+-- this also always points `pcd_map_path` at the same `latest.pcd`, used
+by `fast_lio_localization` (real ICP relocalization against it, see
+below) for continuous correction. FAST-LIO2 itself has no "localize
+against a prior map" mode -- it always runs live SLAM from scratch on
+startup, so its own point cloud (FastLioCloud/yellow in RViz) keeps
+growing regardless of mode; ICP is what keeps that fresh session's frame
+aligned with the map you actually saved. **Give it an initial pose**
+with RViz's "2D Pose Estimate" once localization starts -- same as AMCL,
+ICP needs a real seed to converge to the correct alignment rather than a
+wrong one.
 
 Manipulation (arm pick/place on top of navigation):
 
@@ -157,15 +162,26 @@ Notes if you touch this stack:
   ("Input point cloud has no data!") since nothing else ever populates
   the point buffer it saves.
 - `fastlio_map_odom_bridge.py` turns FAST-LIO2's `/Odometry` (its own
-  `camera_init` frame) into the `map -> odom` transform Nav2 looks for,
-  optionally refined continuously via ICP against a saved PCD
-  (`pcd_map_path` arg) instead of relying only on RViz's "2D Pose
-  Estimate".
+  `camera_init` frame) into the `map -> odom` transform Nav2 looks for.
+  While mapping (no prior map), it auto-aligns once at startup from the
+  current pose. While localizing (`use_external_localization:=true`), it
+  instead relays `/map_to_odom` from `fast_lio_localization` (a vendored
+  ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION, `ros2_ws/src/fast_lio_localization`)
+  -- real coarse-to-fine ICP against the saved PCD, seeded by "2D Pose
+  Estimate", not a one-shot blind guess (that wasn't reliable: this run's
+  camera_init has no relationship to whatever old session's frame the
+  saved map was recorded in). Both paths compose through the fixed
+  `base_frame -> body_frame` offset (FAST-LIO2's "body" is physically the
+  IMU, not base_footprint -- conflating them was a real, previously-shipped
+  bug, a constant ~0.76m z bias easy to mistake for ordinary FAST-LIO2
+  drift) and constrain any correction to x/y/yaw, never z/roll/pitch
+  (unconstrained point-to-point ICP measured drifting a ground robot's
+  height by over a meter otherwise).
 - `mapping.launch.py` also runs `mapping_preview_node.py` (re-projects
   the accumulating map cloud into a live 2D preview, since FAST-LIO2 has
-  no live 2D map the way slam_toolbox used to) and two identity static
-  transforms (`map -> camera_init`, `map -> odom`) so RViz has something
-  to resolve while mapping, before any real map exists.
+  no live 2D map the way slam_toolbox used to) and `fastlio_map_odom_bridge`
+  itself, so RViz has something to resolve while mapping, before any real
+  map exists.
 
 ## Control panel
 
