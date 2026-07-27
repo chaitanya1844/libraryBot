@@ -5,16 +5,19 @@ don't run both at once, they'd fight over publishing `map -> odom`.
 Still starts `map_server` (Nav2's costmaps need the static 2D map
 regardless of what provides localization) and a lifecycle manager for
 it, plus the same 3D lidar Velodyne-format adapter + FAST-LIO2
-`fastlio_mapping` node as `localization_3d.launch.py`, plus
-`fastlio_map_odom_bridge` to turn FAST-LIO2's own pose estimate into the
-`map -> odom` transform Nav2 actually looks for.
+`fastlio_mapping` node as `localization_3d.launch.py`.
 
-Pass `pcd_map_path` (a PCD saved by a previous fastlio_mapping run, see
-pcd_to_2d_map.py's docstring for how that PCD also becomes the `map`
-arg's 2D yaml/pgm) to have the bridge continuously correct itself via
-ICP against that map, instead of relying only on a single "2D Pose
-Estimate" click in RViz -- see fastlio_map_odom_bridge.py's docstring
-for the full explanation.
+Real relocalization against `pcd_map_path` (a PCD saved by a previous
+fastlio_mapping run -- see pcd_to_2d_map.py's docstring for how that PCD
+also becomes the `map` arg's 2D yaml/pgm) is fast_lio_localization's
+`global_localization.py`: a ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION,
+proper coarse-to-fine ICP against the saved map, seeded by RViz's
+"2D Pose Estimate" (same as AMCL needs) and continuously re-registering
+afterward. `fastlio_map_odom_bridge` (use_external_localization:=true)
+just relays its /map_to_odom output through this project's own
+map -> odom math (composing through the fixed base<->body offset and
+this project's EKF-based odom frame) -- see both nodes' own docstrings
+for why a single local ICP pass here wasn't reliable enough on its own.
 
 Requires the separate ~/fastlio_ws overlay sourced first, same as
 localization_3d.launch.py:
@@ -44,9 +47,8 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('map', default_value=os.path.join(
             get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
-        DeclareLaunchArgument('pcd_map_path', default_value='',
-                               description='PCD map for continuous ICP correction. Empty = '
-                                            'rely on a single RViz "2D Pose Estimate" click instead.'),
+        DeclareLaunchArgument('pcd_map_path', default_value=os.path.expanduser(
+            '~/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd')),
 
         Node(
             package='nav2_map_server',
@@ -77,10 +79,28 @@ def generate_launch_description():
         ),
 
         Node(
+            package='fast_lio_localization',
+            executable='global_localization.py',
+            name='fast_lio_localization',
+            output='screen',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'pcd_map_path': pcd_map_path,
+                # Default (0.8) is tuned for dense real-hardware lidar
+                # scans; this project's simulated 3D lidar (16 channels,
+                # 5Hz) produces sparser scans that measured consistently
+                # converging around 0.79-0.80 fitness -- a real, stable
+                # match, just short of an arbitrary threshold that fits
+                # denser data.
+                'localization_threshold': 0.6,
+            }],
+        ),
+
+        Node(
             package='libbot_localization',
             executable='fastlio_map_odom_bridge.py',
             name='fastlio_map_odom_bridge',
             output='screen',
-            parameters=[{'use_sim_time': use_sim_time, 'pcd_map_path': pcd_map_path}],
+            parameters=[{'use_sim_time': use_sim_time, 'use_external_localization': True}],
         ),
     ])

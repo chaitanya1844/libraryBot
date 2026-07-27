@@ -3,7 +3,7 @@
 <package format="3">
   <name>libbot_localization</name>
   <version>0.1.0</version>
-  <description>EKF (robot_localization) and AMCL localization configuration for libraryBot</description>
+  <description>EKF (robot_localization) and FAST-LIO2 (3D lidar-inertial) localization configuration for libraryBot</description>
   <maintainer email="chaitanyabht@gmail.com">chaitanyabht</maintainer>
   <license>Apache-2.0</license>
 
@@ -18,18 +18,16 @@
        a separate overlay workspace, see that launch file's docstring. -->
   <exec_depend>fast_lio</exec_depend>
   <exec_depend>libbot_perception</exec_depend>
+  <!-- localization_fastlio.launch.py's actual relocalization-against-a-
+       saved-map engine (fastlio_map_odom_bridge.py just relays its
+       /map_to_odom output, see that package's own docstring). -->
+  <exec_depend>fast_lio_localization</exec_depend>
 
   <!-- fastlio_map_odom_bridge.py (localization_fastlio.launch.py) -->
   <exec_depend>rclpy</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
   <exec_depend>python3-scipy</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
-  <exec_depend>sensor_msgs</exec_depend>
-  <exec_depend>sensor_msgs_py</exec_depend>
-  <!-- Open3D (ICP against a saved PCD map, fastlio_map_odom_bridge.py's
-       pcd_map_path option) has no rosdep key, install via
-       "pip install open3d". Already present on this dev machine. Also
-       used by libbot_mapping/scripts/pcd_to_2d_map.py. -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>
