@@ -88,12 +88,13 @@ Visualization Manager:
       Use Fixed Frame: true
       Enabled: true
 
-    # Off by default: the D435i's raw depth cloud is ~307k points/frame
-    # (640x480), heavy enough to exhaust VRAM on constrained GPUs when
-    # rendered alongside Gazebo + the lidar cloud + costmaps. The 2D
+    # On by default per user request. The D435i's raw depth cloud is
+    # ~307k points/frame (640x480), heavy enough to strain VRAM on
+    # constrained GPUs when rendered alongside Gazebo + the lidar cloud +
+    # costmaps -- if rviz2 crashes/stutters, disable this first (the 2D
     # CameraColor image below gives the same "see what the camera sees"
-    # view far more cheaply; enable this one specifically when you need
-    # 3D geometry from the depth camera.
+    # view far more cheaply) or lower width/height/hz in
+    # depth_camera_gazebo.urdf.xacro.
     - Class: rviz_default_plugins/PointCloud2
       Name: DepthCameraPointCloud
       Topic:
@@ -103,7 +104,7 @@ Visualization Manager:
       Size (m): 0.015
       Style: Flat Squares
       Color Transformer: RGB8
-      Enabled: false
+      Enabled: true
 
     # Off by default: rviz2's Image display allocates its own separate
     # GL render target, which reliably crashed rviz2 on this box's GPU

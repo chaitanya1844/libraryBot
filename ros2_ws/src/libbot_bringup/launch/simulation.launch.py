@@ -1,5 +1,6 @@
 """Core bringup: Gazebo + robot + control + lidar processing + EKF +
-control panel + RViz. Does NOT start SLAM or AMCL by default -- drive the
+Xbox teleop + control panel + RViz. Does NOT start SLAM or AMCL by
+default -- drive the
 robot around with the RViz-embedded control panel's "Start Mapping" /
 "Start Localization" / "Start Navigation" buttons to move through that
 workflow interactively (see README "Map, localize, navigate workflow").
@@ -62,6 +63,7 @@ def generate_launch_description():
     yaw = LaunchConfiguration('yaw')
     control_panel = LaunchConfiguration('control_panel')
     rviz = LaunchConfiguration('rviz')
+    teleop_joy = LaunchConfiguration('teleop_joy')
 
     is_mapping = PythonExpression(["'", mode, "' == 'mapping'"])
     is_navigation = PythonExpression(["'", mode, "' == 'navigation'"])
@@ -90,6 +92,10 @@ def generate_launch_description():
         # same controls in two separate windows.
         DeclareLaunchArgument('control_panel', default_value='false'),
         DeclareLaunchArgument('rviz', default_value='true'),
+        DeclareLaunchArgument('teleop_joy', default_value='true',
+                               description='Start Xbox controller teleop automatically. '
+                                            'Harmless with no controller plugged in -- '
+                                            'joy_node just logs that it found no device.'),
 
         # 1. Gazebo world
         _include('libbot_gazebo', 'gazebo.launch.py', {
@@ -128,7 +134,11 @@ def generate_launch_description():
             'map': map_yaml,
         }, delay=11.0),
 
-        # 6. Control panel + RViz
+        # 6. Xbox controller teleop -- manual driving for mapping runs
+        _include('libbot_control', 'teleop_joy.launch.py', {},
+                 condition=IfCondition(teleop_joy), delay=6.0),
+
+        # 7. Control panel + RViz
         _include('libbot_control_panel', 'control_panel.launch.py', {},
                  condition=IfCondition(control_panel), delay=6.0),
         Node(
