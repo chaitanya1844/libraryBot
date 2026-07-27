@@ -7,6 +7,11 @@ install(DIRECTORY config launch
   DESTINATION share/${PROJECT_NAME}
 )
 
+install(PROGRAMS
+  libbot_control/arm_stow_node.py
+  DESTINATION lib/${PROJECT_NAME}
+)
+
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)
   ament_lint_auto_find_test_dependencies()

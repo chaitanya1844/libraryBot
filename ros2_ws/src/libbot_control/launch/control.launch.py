@@ -42,8 +42,23 @@ def generate_launch_description():
     delayed_mecanum_spawner = TimerAction(period=3.0, actions=[mecanum_drive_controller_spawner])
     delayed_arm_spawner = TimerAction(period=3.0, actions=[arm_controller_spawner])
 
+    # Send the arm to its stowed pose once arm_controller is up, so it
+    # never sits at its spawn/zero pose -- with the arm mounted on the
+    # chassis side, all-joints-zero extends the whole arm straight out
+    # (~0.7m), which gets in the way navigating tight corners/aisles
+    # (mapping runs especially) until something explicitly commands it
+    # elsewhere, e.g. libbot_manipulation's task manager.
+    arm_stow_node = Node(
+        package='libbot_control',
+        executable='arm_stow_node.py',
+        name='arm_stow_node',
+        output='screen',
+    )
+    delayed_arm_stow = TimerAction(period=6.0, actions=[arm_stow_node])
+
     return LaunchDescription([
         joint_state_broadcaster_spawner,
         delayed_mecanum_spawner,
         delayed_arm_spawner,
+        delayed_arm_stow,
     ])
