@@ -13,7 +13,10 @@
 
   <xacro:libbot_imu parent="base_link" xyz="0 0 ${chassis_z/2 + 0.01}"/>
 
-  <xacro:libbot_lidar_3d parent="sensor_mast_link" xyz="0 0 ${mast_height/2 + 0.03}" hz="5"/>
+  <!-- Raised well above the sensor-mast puck top (was only 0.03m above
+       it, so the lidar's own downward FOV rays clipped the mast/chassis
+       fascia at short range, especially once the robot started moving). -->
+  <xacro:libbot_lidar_3d parent="sensor_mast_link" xyz="0 0 ${mast_height/2 + 0.15}" hz="5"/>
 
   <!-- RealSense D435i mounted forward-facing on the chassis's upper
        front face at roughly mid-shelf height, angled down slightly to

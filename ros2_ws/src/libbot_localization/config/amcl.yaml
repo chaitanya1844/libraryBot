@@ -44,8 +44,16 @@
       scan_topic: scan
       set_initial_pose: true
       always_reset_initial_pose: false
+      # Must match simulation.launch.py's spawn 'yaw' default. That was
+      # flipped 180deg (to -1.5708) per a prior user request but this
+      # value was never updated to match, so AMCL seeded its particle
+      # filter facing the wrong way at the start of every run -- scans
+      # wouldn't line up with the map until/unless the filter happened to
+      # converge past a 180-degree error, which a symmetric library aisle
+      # doesn't reliably do. This is the actual cause of "map doesn't
+      # align with live data".
       initial_pose:
         x: 1.0
         y: 3.3
         z: 0.0
-        yaw: 1.5708
+        yaw: -1.5708

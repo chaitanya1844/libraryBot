@@ -35,10 +35,17 @@
     </inertial>
   </link>
 
+  <!-- Side-mounted (on the -Y side, opposite chassis_side_panel_link on
+       +Y in base.urdf.xacro) rather than perched on the front-top edge,
+       where it visually collided with chassis_fascia_link. No yaw
+       rotation: the arm's local +X ("reach" direction, see all the link
+       visual/collision offsets below) still points straight forward,
+       exactly as when it was front-mounted, so the canned joint poses in
+       libbot_manipulation/task_manager_node.py need no changes. -->
   <joint name="arm_base_joint" type="fixed">
     <parent link="base_link"/>
     <child link="arm_base_link"/>
-    <origin xyz="${chassis_x/2 - 0.08} 0 ${chassis_z/2 + 0.03}" rpy="0 0 0"/>
+    <origin xyz="0.05 ${-(chassis_y/2 + 0.03)} ${chassis_z/2 - 0.05}" rpy="0 0 0"/>
   </joint>
 
   <!-- shoulder_pan: yaw about the arm base -->

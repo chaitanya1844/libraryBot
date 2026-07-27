@@ -1,35 +1,26 @@
 # libraryBot
 
 A ROS 2 Humble + Gazebo Classic 11 simulation of an autonomous library
-book-sorting robot: a holonomic (mecanum) base with a 3D lidar, IMU, and
-RealSense D435i depth camera, navigating a library floor plan (derived
-from `aws-robomaker-bookstore-world`), reading simulated RFID tags on
-books, and driving them to the correct shelf using Nav2.
+robot: a holonomic (mecanum) base with a side-mounted 4-DOF pick/place
+arm, a 3D lidar, an IMU, and a RealSense D435i depth camera, navigating a
+library floor plan (derived from `aws-robomaker-bookstore-world`) with
+Nav2 and picking books up off shelves with the arm.
 
 ```
-Book at intake --RFID read--> shelf lookup --Nav2--> shelf --place--> repeat
+Nav2 drives to a book --arm reaches + grips--> carry --Nav2--> shelf --place--> repeat
 ```
+
+![The robot in the library, arm side-mounted, lidar mast raised](docs/robot_in_library.png)
 
 ## What's simulated vs. simplified
 
 Read this before you go looking for something that "should" be there:
 
-- **RFID**: there's no RF physics. `libbot_perception`'s `rfid_reader_node`
-  watches Gazebo's `/libbot/model_states` and fires an `RfidTag` reading
-  when the robot comes within `read_range` of a tagged book prop. This is
-  the standard way to simulate RFID in Gazebo since there's no antenna/RF
-  plugin available.
-- **Book placement**: the robot has no arm/gripper. "Placing" a book
-  teleports its Gazebo prop onto the shelf via `/libbot/set_entity_state`.
-  If you want a manipulator, that's a real hardware/URDF addition on top
-  of this repo, not something toggled by config.
-- **Shelf-slot detection**: `shelf_slot_detector_node` does real depth-image
-  processing (bins a horizontal band of the D435i depth image, picks the
-  bin that reads farthest as the likely gap), not a trained object
-  detector. It's a genuine, working heuristic, not a stub — but don't
-  expect it to distinguish "empty slot" from "book spine" reliably. The
-  sorting task manager has a 3s timeout and proceeds without a slot
-  reading if none arrives, so this never blocks a sort job.
+- **Grasping**: the arm has no fingers/moving gripper joint and grasping
+  isn't contact/friction-based. `libbot_gazebo_plugins`' link-attacher
+  plugin welds a book model's link to `gripper_link` on pick (a
+  kinematic pose-follow every physics step, not a physics joint -- see
+  "Manipulation (pick/place)" below for why) and releases it on place.
 - **Drivetrain**: the base is modeled as 4 mecanum wheels visually, but
   actual propulsion comes from Gazebo's `planar_move` plugin (sets body
   velocity directly), not wheel-ground friction. See "Drivetrain design
@@ -45,15 +36,15 @@ Read this before you go looking for something that "should" be there:
 
 ```
 ros2_ws/src/
-├── libbot_msgs            Custom messages/services (RfidTag, ShelfSlot, SortTaskStatus, SortBook, GetShelfPose)
-├── libbot_description      URDF/xacro: chassis, mecanum wheels, 3D lidar, IMU, RealSense D435i, ros2_control
-├── libbot_gazebo            Library world (from aws-robomaker-bookstore-world), spawn launch, RFID book props
-├── libbot_control            mecanum_drive_controller + joint_state_broadcaster (ros2_control) config/launch
-├── libbot_localization        robot_localization EKF + AMCL config/launch
+├── libbot_description      URDF/xacro: chassis, mecanum wheels, side-mounted arm, 3D lidar, IMU, RealSense D435i, ros2_control
+├── libbot_gazebo            Library world (from aws-robomaker-bookstore-world), spawn launch, book/shelf props
+├── libbot_gazebo_plugins     Link-attacher Gazebo world plugin (AttachLink/DetachLink services) for pick/place
+├── libbot_control            mecanum_drive_controller + arm_controller + joint_state_broadcaster (ros2_control) config/launch
+├── libbot_manipulation        book_catalog.yaml, shelf_catalog.yaml, the Nav2+arm task manager (task_manager_node.py)
+├── libbot_localization        robot_localization EKF + AMCL config/launch, plus FAST-LIO2 3D lidar-inertial localization
 ├── libbot_mapping             SLAM Toolbox config/launch + the bundled default map
 ├── libbot_navigation           Nav2 params (holonomic DWB tuning) + launch + RViz config
-├── libbot_perception            Lidar->2D scan, RFID reader, depth-camera shelf-slot detector
-├── libbot_sorting                shelf_map.yaml, book_catalog.yaml, the Nav2-driving task manager
+├── libbot_perception            Lidar->2D scan, 3D-lidar-to-Velodyne-format adapter (for FAST-LIO2)
 ├── libbot_control_panel           Standalone PyQt5 GUI (legacy/headless fallback -- see "Control panel")
 ├── libbot_rviz_plugins             Native RViz2 panel (C++/Qt): the primary control surface, embedded in RViz
 └── libbot_bringup                  Top-level launch files (simulation.launch.py, autonomy.launch.py)
@@ -123,9 +114,11 @@ two things fighting over the `map -> odom` transform:
    it doesn't, use RViz's **2D Pose Estimate** tool to give AMCL a nudge
    in the right place.
 3. **3. Start Navigation** -- brings up Nav2 (planner/controller/
-   behaviors), RFID reading, and the sorting task manager, on top of the
-   localization from step 2. This is when the robot starts reading tags
-   at the intake and driving books to shelves.
+   behaviors) on top of the localization from step 2. Add
+   `collect_books:=true` (`ros2 launch libbot_bringup autonomy.launch.py
+   collect_books:=true`, not currently wired to a panel button) to also
+   start the arm task manager, which is when the robot starts driving to
+   books and picking them up -- see "Manipulation (pick/place)" below.
 
 You can also drive any single stage directly from the CLI instead of the
 panel (useful for scripting): `ros2 launch libbot_mapping
@@ -158,6 +151,101 @@ that error, it's this race, not a config problem -- **just click the
 button (or run the command) again**; check `free -h` first if it keeps
 happening (see Troubleshooting).
 
+## Manipulation (pick/place)
+
+```bash
+ros2 launch libbot_bringup autonomy.launch.py collect_books:=true
+```
+
+`libbot_manipulation`'s `task_manager_node.py` loops over
+`book_catalog.yaml`: Nav2-drives to a book's `approach_pose`, sends a
+scripted `FollowJointTrajectory` goal to `/libbot/arm_controller` (canned
+stow/reach/lift joint poses, not IK -- the arm's geometry only needs to
+plausibly reach across a desk in front of the robot), calls
+`/libbot/attach_link` to weld the book to `gripper_link`, Nav2-drives to
+a shelf from `shelf_catalog.yaml`, calls `/libbot/detach_link`, and
+teleports the book onto the shelf pose via `/libbot/set_entity_state`.
+
+Three things worth knowing if you touch this stack:
+
+- **The arm is side-mounted**, off the chassis's `-Y` face
+  (`arm_base_joint` in `arm.urdf.xacro`), not perched on the front-top
+  edge like an early version of this robot -- that placement visually
+  collided with the front fascia and didn't read as a real mounted arm.
+- **`gripper_link` has to survive as a real Gazebo link.** Gazebo
+  Classic's URDF->SDF conversion lumps any `fixed`-jointed child link's
+  geometry into its parent, and `<disableFixedJointLumping>` (the usual
+  fix) isn't honored by every sdformat build. `gripper_link` is attached
+  via a zero-range `revolute` joint instead -- functionally rigid, never
+  lumped regardless of sdformat quirks.
+- **Grasping is a kinematic pose-follow, not a physics joint.** The
+  link-attacher plugin (`libbot_gazebo_plugins`) tried an ODE `fixed`
+  joint between the gripper and a book first; a dynamically created
+  joint between two independent top-level models turned out to resonate
+  into a runaway tumble within a couple of physics steps, no matter how
+  mass/velocity/anchor were fixed up. `OnWorldUpdate` instead teleports
+  the book to track the gripper's pose every physics step while the
+  book stays a static body -- there's no constraint solver involved, so
+  nothing to destabilize.
+
+## 3D localization (FAST-LIO2)
+
+The 3D lidar (`/libbot/lidar_3d/points`) is otherwise only ever
+flattened to 2D via `pointcloud_to_laserscan` for AMCL/Nav2's costmaps.
+To actually see 3D lidar-inertial localization working, this repo wires
+up [FAST-LIO2](https://github.com/hku-mars/FAST_LIO/tree/ROS2) (tightly-
+coupled LiDAR-IMU odometry via an iterated Kalman filter + incremental
+k-d tree) instead of a full SLAM stack like rtabmap -- rtabmap's GTSAM
+factor-graph backend is real weight for what's a fairly small, bounded
+environment, and the goal here includes eventually running on a Jetson
+Nano Super, where that weight matters.
+
+![FAST-LIO2 tracking the robot's live trajectory in RViz](docs/fastlio_3d_map.png)
+
+```bash
+# One-time: build the FAST_LIO ROS2 branch + livox_ros_driver2 (needed
+# only for message-type headers -- there's no real Livox hardware here)
+# + Livox-SDK2 in a separate overlay workspace:
+mkdir -p ~/fastlio_ws/src && cd ~/fastlio_ws/src
+git clone https://github.com/Livox-SDK/Livox-SDK2.git
+git clone https://github.com/Livox-SDK/livox_ros_driver2.git
+git clone --recursive --branch ROS2 https://github.com/hku-mars/FAST_LIO.git
+# Livox-SDK2: cmake -DCMAKE_INSTALL_PREFIX=<prefix> .. && make install
+# livox_ros_driver2: cp package_ROS2.xml package.xml; cp -r launch_ROS2/ launch/
+#   (its CMakeLists.txt hardcodes /usr/local for the SDK -- point the
+#   find_library/find_path calls at <prefix> instead if you installed
+#   Livox-SDK2 somewhere else)
+cd ~/fastlio_ws && colcon build --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humble
+
+# Every run:
+source /opt/ros/humble/setup.bash
+source ~/fastlio_ws/install/setup.bash
+source ~/libraryBot/ros2_ws/install/setup.bash
+ros2 launch libbot_localization localization_3d.launch.py
+```
+
+Two adaptations were needed to point FAST-LIO2 (built for real spinning
+mechanical lidars) at this project's simulated sensor:
+
+- **No `ring`/`time` per-point fields.** Gazebo's `ray` sensor captures
+  the whole cloud at one simulation instant (no real per-point capture
+  time to recover), but FAST-LIO2's Velodyne point type needs both.
+  `libbot_perception/lidar_3d_velodyne_adapter.py` republishes the cloud
+  with both fields synthesized from each point's geometry (`ring` from
+  vertical angle bucketed across the lidar's known channel count,
+  `time` from horizontal angle mapped across one frame period) on
+  `/libbot/lidar_3d/points_velodyne`.
+- **IMU-lidar extrinsic** (`libbot_localization/config/fast_lio_libbot.yaml`,
+  `extrinsic_T`) is computed directly from the URDF chain (both sensors
+  are on fixed, axis-aligned joints relative to `base_link`) rather than
+  calibrated, since this is simulation.
+
+FAST-LIO2 publishes its own odometry (`/Odometry`, frame `camera_init`
+-> `body`) independent of the EKF's `odom` frame used by the 2D AMCL/Nav2
+stack, so it can run alongside `simulation.launch.py` without fighting
+over a TF frame -- this is a standalone 3D localization/mapping demo, not
+merged into Nav2's costmaps.
+
 ## Control panel
 
 The primary control surface is **"libraryBot Controls"**, a native RViz2
@@ -177,9 +265,6 @@ internally (spun via a `QTimer` calling `rclcpp::spin_some` every 50ms).
   it reactivates the controller. This does **not** cancel a Nav2 goal in
   progress -- Nav2 will keep planning and re-issue commands once the
   controller is back; cancel the goal separately if you need that.
-- **Sorting**: Start/Resume or Pause the task manager, or queue a manual
-  sort job by tag id / title / genre (title and tag id are optional;
-  genre picks a shelf if `target_shelf_id` is left to auto-resolve).
 - **Camera**: "Open Camera View" launches `rqt_image_view` in a separate
   window/process pointed at the D435i's color topic -- see "GPU/VRAM
   notes" below for why this isn't just an RViz Image display.
@@ -303,29 +388,29 @@ Everything you're likely to want to tune, and where it lives:
 | AMCL particle filter tuning | `libbot_localization/config/amcl.yaml` |
 | SLAM Toolbox mapping density | `libbot_mapping/config/slam_toolbox_online_async.yaml` |
 | Nav2: velocity/accel limits, critics, costmaps, BT | `libbot_navigation/config/nav2_params.yaml` |
-| RFID read range | `libbot_bringup` launch arg `read_range`, or `libbot_perception/launch/perception.launch.py` |
-| Which books exist / their target shelf | `libbot_sorting/config/book_catalog.yaml` -- add more `libbot_rfid_book_N` props to `libbot_gazebo/worlds/library.world` to match |
-| Shelf locations / genres / approach poses | `libbot_sorting/config/shelf_map.yaml` |
-| Intake/home station pose | `shelf_map.yaml`'s `intake_station` key |
+| Which books exist / their approach pose | `libbot_manipulation/config/book_catalog.yaml` -- must match book props in `libbot_gazebo/worlds/library.world` |
+| Shelf locations / approach poses | `libbot_manipulation/config/shelf_catalog.yaml` |
+| Arm joint limits/mount, gripper | `libbot_description/urdf/arm/arm.urdf.xacro` (`arm_base_joint` origin is the side mount point) |
+| Arm trajectory controller | `libbot_control/config/controllers.yaml` (`arm_controller`, `joint_trajectory_controller`) |
+| 3D localization (FAST-LIO2) tuning | `libbot_localization/config/fast_lio_libbot.yaml` |
 
 ### Adding a new book
 
-1. Add a `libbot_rfid_book_N` model instance to `library.world` (copy an
-   existing `libbot_rfid_book_*` block, bump the number, place it near
-   the intake).
-2. Add a matching entry to `book_catalog.yaml` with `gazebo_model:
-   "libbot_rfid_book_N"`, a `tag_id` (convention: `BOOK-NNNNNN` matching
-   N, since the sorting task manager infers the prop name from the tag id
-   this way when it needs to place the book), and `target_shelf_id`.
+1. Add a book prop instance to `library.world` (copy an existing
+   `BookE_01_*`/`BookF_01_*`/etc. `<include>` block, give it a unique
+   `name`, place it on a shelf).
+2. Add a matching entry to `libbot_manipulation/config/book_catalog.yaml`
+   with that same `name`, its `pose` (where the book actually rests, for
+   `set_entity_state` after placing), and an `approach_pose` (where Nav2
+   drives the base to before the arm reaches for it).
 
 ### Adding a new shelf
 
-Add an entry to `shelf_map.yaml` under `shelves:` with `gazebo_model` (an
-existing shelf model name from `library.world`), `genre`, `approach_pose`
-(where Nav2 drives to), and `shelf_pose` (where the book prop gets
-placed). The bundled `approach_pose` values were computed automatically
-(a 0.9m standoff facing each shelf's center) and not hand-verified against
-every aisle, so double check the new one doesn't land inside furniture.
+Add an entry to `libbot_manipulation/config/shelf_catalog.yaml` with
+`name` (an existing shelf model name from `library.world`), `pose`
+(where a placed book should rest on it), and `approach_pose` (where Nav2
+drives to). Double check a new `approach_pose` doesn't land inside
+furniture -- these aren't automatically collision-checked.
 
 ## Chassis dimensions
 
@@ -356,11 +441,12 @@ re-check against that aisle number and bump `robot_radius` in
 physically fit through.
 
 Because the chassis is now most of the robot's height, the 3D lidar's
-mount height dropped from ~1.05m to ~0.975m -- `libbot_perception/config/
-pointcloud_to_laserscan.yaml`'s height band and the depth camera's
-`min_obstacle_height`/`max_obstacle_height` in `nav2_params.yaml` were
-both recalculated to match (see "Adding a new book" table above and the
-comments in those files for the actual numbers and the reasoning).
+mount height dropped from the original mast-top design; it was later
+raised again (`libbot.urdf.xacro`'s `libbot_lidar_3d` instantiation) once
+the mast/chassis fascia turned out to sit close enough underneath it to
+clip the lidar's own downward field of view -- if you change the mast or
+arm geometry, re-check that the lidar's `-vfov_deg/2` ray still clears
+whatever's directly below it.
 
 ## Drivetrain design note
 
@@ -420,13 +506,6 @@ drive it back out or respawn.
 map is small and partial (see "What's simulated vs. simplified"). Build
 a fuller map first (see "Mapping mode").
 
-**Shelf-slot detector never publishes** It depends on the D435i's depth
-image topic, which is large (640x480 float32 @ 15Hz) and was observed to
-be bandwidth/timing-sensitive under load in testing. This never blocks
-sorting (3s timeout, see "What's simulated vs. simplified"), but if you
-want it working reliably, try lowering `width`/`height`/`hz` on the
-depth camera in `libbot_description/urdf/sensors/depth_camera_gazebo.urdf.xacro`.
-
 ## Manual testing cheatsheet
 
 ```bash
@@ -438,14 +517,14 @@ ros2 topic pub /libbot/mecanum_drive_controller/reference_unstamped geometry_msg
 ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
   "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.3, y: 2.8}, orientation: {w: 1.0}}}}"
 
-# Manually queue a sort job without waiting for RFID
-ros2 service call /libbot/sorting/sort_book libbot_msgs/srv/SortBook \
-  "{tag_id: 'TEST-1', book_title: 'Test Book', genre: 'fiction', target_shelf_id: ''}"
+# Move the arm directly (bypasses the task manager)
+ros2 action send_goal /libbot/arm_controller/follow_joint_trajectory control_msgs/action/FollowJointTrajectory \
+  "{trajectory: {joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_pitch_joint], \
+    points: [{positions: [0.3, -0.5, 0.8, 0.2], time_from_start: {sec: 2}}]}}"
 
-# Pause / resume the sorting loop
-ros2 service call /libbot/sorting/set_enabled std_srvs/srv/SetBool "{data: false}"
-
-# Watch RFID reads and sorting status live
-ros2 topic echo /libbot/rfid/tag_detected
-ros2 topic echo /libbot/sorting/status
+# Weld a book to the gripper directly (bypasses the task manager)
+ros2 service call /libbot/attach_link libbot_gazebo_plugins/srv/AttachLink \
+  "{model1_name: libbot, link1_name: gripper_link, model2_name: BookE_01_001, link2_name: link}"
+ros2 service call /libbot/detach_link libbot_gazebo_plugins/srv/DetachLink \
+  "{model1_name: libbot, link1_name: gripper_link, model2_name: BookE_01_001, link2_name: link}"
 ```

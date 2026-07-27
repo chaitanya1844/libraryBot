@@ -14,6 +14,11 @@
   <exec_depend>nav2_map_server</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
   <exec_depend>libbot_mapping</exec_depend>
+  <!-- 3D localization (localization_3d.launch.py) against the 3D lidar +
+       IMU via FAST-LIO2, not resolvable via rosdep: built from source as
+       a separate overlay workspace, see that launch file's docstring. -->
+  <exec_depend>fast_lio</exec_depend>
+  <exec_depend>libbot_perception</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

@@ -72,6 +72,7 @@ def generate_launch_description():
             name='behavior_server',
             output='screen',
             parameters=[params_file],
+            remappings=[cmd_vel_remap],
         ),
         Node(
             package='nav2_bt_navigator',
