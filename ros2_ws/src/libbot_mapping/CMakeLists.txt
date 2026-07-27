@@ -9,6 +9,7 @@ install(DIRECTORY config launch maps
 
 install(PROGRAMS
   scripts/pcd_to_2d_map.py
+  scripts/mapping_preview_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

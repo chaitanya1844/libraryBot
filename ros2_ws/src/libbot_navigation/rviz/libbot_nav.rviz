@@ -38,6 +38,22 @@ Visualization Manager:
       Alpha: 0.7
       Enabled: true
 
+    # Live 2D preview while mapping (mapping_preview_node.py) -- FAST-LIO2
+    # itself has no equivalent of slam_toolbox's live 2D map, only the 3D
+    # /Laser_map cloud above; this re-projects that same cloud into an
+    # OccupancyGrid every couple seconds so there's visual feedback that
+    # mapping is progressing. Volatile (default rclpy QoS), not
+    # Transient Local like the real map above -- that one comes from
+    # map_server, this one doesn't.
+    - Class: rviz_default_plugins/Map
+      Name: MappingPreview
+      Topic:
+        Value: /mapping_preview_map
+        Depth: 1
+        Durability Policy: Volatile
+      Alpha: 0.7
+      Enabled: true
+
     # Global/local Nav2 costmaps -- the rainbow magenta/cyan cost gradient.
     - Class: rviz_default_plugins/Map
       Name: GlobalCostmap
@@ -74,16 +90,21 @@ Visualization Manager:
 
     # Main 3D perception sensor: full 3D lidar point cloud, rainbow-colored
     # by height (matches the reference visualization style).
+    # De-emphasized on purpose: this is the raw current-instant sensor
+    # scan, not the accumulated map (that's FastLioCloud/Laser_map below)
+    # -- kept small/dim so it doesn't visually compete with the map
+    # that's actually building up.
     - Class: rviz_default_plugins/PointCloud2
       Name: Lidar3D
       Topic:
         Value: /libbot/lidar_3d/points_filtered
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.035
+      Size (m): 0.02
       Style: Flat Squares
       Color Transformer: FlatColor
-      Color: 255; 0; 0
+      Color: 120; 40; 40
+      Alpha: 0.5
       Autocompute Value Bounds: true
       Use Fixed Frame: true
       Enabled: true
@@ -126,16 +147,22 @@ Visualization Manager:
     # Nav2's actual localization source now (see "2. Start Localization"
     # in the control panel / localization_fastlio.launch.py), replacing
     # AMCL, so on by default.
+    # /Laser_map, NOT /cloud_registered: the latter is only FAST-LIO2's
+    # current-instant scan (republished every frame, never accumulates)
+    # -- this is the actual growing map (pcl_wait_pub, only populated
+    # because fast_lio_libbot.yaml sets publish.map_en: true), highlighted
+    # (bright yellow, larger points) so it's obvious mapping is working.
     - Class: rviz_default_plugins/PointCloud2
       Name: FastLioCloud
       Topic:
-        Value: /cloud_registered
+        Value: /Laser_map
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.02
+      Size (m): 0.03
       Style: Flat Squares
       Color Transformer: FlatColor
       Color: 255; 255; 0
+      Alpha: 1.0
       Enabled: true
 
     - Class: rviz_default_plugins/Path

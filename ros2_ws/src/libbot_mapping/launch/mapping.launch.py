@@ -46,6 +46,13 @@ camera_init's origin here is exactly right, not just a placeholder --
 broadcast both as identity so RViz can resolve the live point cloud
 (under camera_init) and the robot model (under odom -> base_footprint,
 a separate branch FAST-LIO2 knows nothing about) while mapping.
+
+Also runs mapping_preview_node.py: FAST-LIO2 has no live 2D map the way
+slam_toolbox used to show one (the real 2D map only exists once,
+generated after the fact by pcd_to_2d_map.py against the saved PCD) --
+this republishes the same accumulating /Laser_map cloud as a live
+OccupancyGrid preview every couple seconds, purely for visual feedback
+that mapping is actually accumulating data while you drive.
 """
 import os
 
@@ -78,6 +85,14 @@ def generate_launch_description():
             name='map_to_odom',
             output='screen',
             arguments=['0', '0', '0', '0', '0', '0', 'map', 'odom'],
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+
+        Node(
+            package='libbot_mapping',
+            executable='mapping_preview_node.py',
+            name='mapping_preview_node',
+            output='screen',
             parameters=[{'use_sim_time': use_sim_time}],
         ),
 
