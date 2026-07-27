@@ -62,7 +62,16 @@ case "$MODE" in
   localization)
     stop_stack
     source_fastlio_ws
-    ros2 launch libbot_localization localization_fastlio.launch.py "map:=${MAP_PATH}" &
+    # Same PCD /map_save always writes (pcd_maps/latest.pcd, overwritten
+    # each mapping run) -- enables continuous ICP correction against it
+    # instead of only the one-shot auto-align at startup. FAST-LIO2 itself
+    # has no "localize against a prior map" mode: it always runs live SLAM
+    # from scratch, so its own point cloud (FastLioCloud/yellow) will keep
+    # growing regardless -- this is what keeps that fresh session aligned
+    # with the map you actually saved.
+    PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+    ros2 launch libbot_localization localization_fastlio.launch.py \
+      "map:=${MAP_PATH}" "pcd_map_path:=${PCD_PATH}" &
     ;;
   navigation)
     # Additive on top of an already-running localization stage -- does

@@ -104,11 +104,14 @@ Convert the PCD to the 2D map Nav2's costmaps need:
 ros2 run libbot_mapping pcd_to_2d_map.py ~/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd my_map_name
 ```
 Writes `my_map_name.yaml`/`.pgm` into `libbot_mapping/maps/`. Then
-`switch_mode.sh localization ~/libraryBot/ros2_ws/src/libbot_mapping/maps/my_map_name.yaml`,
-optionally passing `pcd_map_path:=` the same PCD to
-`localization_fastlio.launch.py` directly for continuous ICP correction
-against it (`switch_mode.sh` doesn't expose this arg yet -- call the
-launch file directly if you need it).
+`switch_mode.sh localization ~/libraryBot/ros2_ws/src/libbot_mapping/maps/my_map_name.yaml`
+-- this also always points `pcd_map_path` at the same `latest.pcd` for
+continuous ICP correction. FAST-LIO2 itself has no "localize against a
+prior map" mode -- it always runs live SLAM from scratch on startup, so
+its own point cloud (FastLioCloud/yellow in RViz) keeps growing
+regardless of mode; ICP is what keeps that fresh session's frame aligned
+with the map you actually saved, instead of just a one-shot guess at
+startup.
 
 Manipulation (arm pick/place on top of navigation):
 
