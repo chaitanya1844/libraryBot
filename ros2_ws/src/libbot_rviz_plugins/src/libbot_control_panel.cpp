@@ -52,6 +52,9 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
     "QPushButton:checked { background-color: #7b241c; }");
   connect(estop_button_, &QPushButton::toggled, this, &LibbotControlPanel::onEStopToggled);
   estop_v->addWidget(estop_button_);
+  auto * reset_pos_btn = new QPushButton("Reset Position");
+  connect(reset_pos_btn, &QPushButton::clicked, this, &LibbotControlPanel::onResetPosition);
+  estop_v->addWidget(reset_pos_btn);
   root->addWidget(estop_box);
 
   // ---------------- teleop override ----------------
@@ -108,18 +111,33 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   root->addWidget(teleop_box);
   setTeleopButtonsEnabled(false);
 
-  // ---------------- camera ----------------
-  // RViz's own Image display crashes this GPU/driver combination
-  // (separate GL render target -> "libGL error: failed to create
-  // drawable" -> Ogre out-of-memory -> SIGABRT), so the D435i color feed
-  // is shown via rqt_image_view instead, which renders in its own
-  // process/GL context and doesn't share rviz2's.
-  auto * camera_box = new QGroupBox("Camera");
-  auto * camera_v = new QVBoxLayout(camera_box);
-  auto * camera_btn = new QPushButton("Open Camera View");
-  connect(camera_btn, &QPushButton::clicked, this, &LibbotControlPanel::onOpenCameraView);
-  camera_v->addWidget(camera_btn);
-  root->addWidget(camera_box);
+  // ---------------- arm ----------------
+  auto * arm_box = new QGroupBox("Arm");
+  auto * arm_grid = new QGridLayout(arm_box);
+  static const struct { const char * name; const char * label; double lower; double upper; } kArmJoints[4] = {
+    {"shoulder_pan_joint", "Pan", -2.0, 2.0},
+    {"shoulder_lift_joint", "Lift", -1.6, 1.2},
+    {"elbow_joint", "Elbow", -2.2, 1.8},
+    {"wrist_pitch_joint", "Wrist", -1.6, 1.6},
+  };
+  for (int i = 0; i < 4; ++i) {
+    auto * slider = new QSlider(Qt::Horizontal);
+    slider->setRange(static_cast<int>(kArmJoints[i].lower * 1000), static_cast<int>(kArmJoints[i].upper * 1000));
+    slider->setValue(0);
+    auto * value_label = new QLabel("0.00");
+    value_label->setMinimumWidth(45);
+    connect(slider, &QSlider::valueChanged, this, [value_label](int v) {
+      value_label->setText(QString::number(v / 1000.0, 'f', 2));
+    });
+    arm_grid->addWidget(new QLabel(kArmJoints[i].label), i, 0);
+    arm_grid->addWidget(slider, i, 1);
+    arm_grid->addWidget(value_label, i, 2);
+    arm_sliders_[i] = slider;
+  }
+  auto * arm_move_btn = new QPushButton("Move Arm");
+  connect(arm_move_btn, &QPushButton::clicked, this, &LibbotControlPanel::onMoveArm);
+  arm_grid->addWidget(arm_move_btn, 4, 0, 1, 3);
+  root->addWidget(arm_box);
 
   // ---------------- mode: Map -> Localize -> Navigate ----------------
   auto * mode_box = new QGroupBox("Mode");
@@ -207,6 +225,12 @@ void LibbotControlPanel::onInitialize()
 
   map_save_client_ = node_->create_client<std_srvs::srv::Trigger>("/map_save");
 
+  set_entity_state_client_ = node_->create_client<gazebo_msgs::srv::SetEntityState>(
+    "/libbot/set_entity_state");
+
+  arm_action_client_ = rclcpp_action::create_client<control_msgs::action::FollowJointTrajectory>(
+    node_, "/libbot/arm_controller/follow_joint_trajectory");
+
   spin_timer_ = new QTimer(this);
   connect(spin_timer_, &QTimer::timeout, this, &LibbotControlPanel::onSpinTimer);
   spin_timer_->start(50);
@@ -277,6 +301,42 @@ void LibbotControlPanel::setEStop(bool engaged)
   req->strictness = controller_manager_msgs::srv::SwitchController::Request::BEST_EFFORT;
   switch_controller_client_->async_send_request(req);
   log(engaged ? "E-stop engaged" : "E-stop released");
+}
+
+namespace
+{
+// Must match libbot_gazebo/launch/spawn_robot.launch.py's default x/y/z/yaw.
+constexpr double kSpawnX = 1.0;
+constexpr double kSpawnY = 3.3;
+constexpr double kSpawnZ = 0.05;
+constexpr double kSpawnYaw = -1.5708;
+}  // namespace
+
+void LibbotControlPanel::onResetPosition()
+{
+  if (!set_entity_state_client_->service_is_ready()) {
+    log("Reset failed: /libbot/set_entity_state not available");
+    return;
+  }
+  auto req = std::make_shared<gazebo_msgs::srv::SetEntityState::Request>();
+  req->state.name = "libbot";
+  req->state.reference_frame = "world";
+  req->state.pose.position.x = kSpawnX;
+  req->state.pose.position.y = kSpawnY;
+  req->state.pose.position.z = kSpawnZ;
+  req->state.pose.orientation.z = std::sin(kSpawnYaw / 2.0);
+  req->state.pose.orientation.w = std::cos(kSpawnYaw / 2.0);
+  // Zeroed explicitly (default-constructed Twist is already all-zero, but
+  // a topple/collision can leave real residual velocity that would carry
+  // straight through the teleport otherwise).
+  req->state.twist = geometry_msgs::msg::Twist();
+  set_entity_state_client_->async_send_request(
+    req, [this](rclcpp::Client<gazebo_msgs::srv::SetEntityState>::SharedFuture future) {
+      auto resp = future.get();
+      QMetaObject::invokeMethod(this, [this, ok = resp->success]() {
+        log(ok ? "Position reset" : "Reset failed");
+      });
+    });
 }
 
 void LibbotControlPanel::onTeleopToggled(bool checked)
@@ -379,11 +439,25 @@ QString switchModeScript()
 }
 }  // namespace
 
-void LibbotControlPanel::onOpenCameraView()
+void LibbotControlPanel::onMoveArm()
 {
-  QProcess::startDetached(
-    "bash", {"-c", "ros2 run rqt_image_view rqt_image_view /libbot/camera/camera/image_raw"});
-  log("Opening camera view...");
+  static const char * kJointNames[4] = {
+    "shoulder_pan_joint", "shoulder_lift_joint", "elbow_joint", "wrist_pitch_joint"};
+
+  if (!arm_action_client_->action_server_is_ready()) {
+    log("Move Arm failed: arm_controller not available");
+    return;
+  }
+  control_msgs::action::FollowJointTrajectory::Goal goal;
+  goal.trajectory.joint_names.assign(kJointNames, kJointNames + 4);
+  trajectory_msgs::msg::JointTrajectoryPoint point;
+  for (int i = 0; i < 4; ++i) {
+    point.positions.push_back(arm_sliders_[i]->value() / 1000.0);
+  }
+  point.time_from_start = rclcpp::Duration::from_seconds(1.5);
+  goal.trajectory.points.push_back(point);
+  arm_action_client_->async_send_goal(goal);
+  log("Arm moving...");
 }
 
 void LibbotControlPanel::onStartMapping()

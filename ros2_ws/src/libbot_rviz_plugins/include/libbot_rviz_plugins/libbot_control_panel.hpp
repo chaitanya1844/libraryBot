@@ -19,6 +19,8 @@
 #include "std_srvs/srv/trigger.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
+#include "gazebo_msgs/srv/set_entity_state.hpp"
+#include "control_msgs/action/follow_joint_trajectory.hpp"
 
 namespace libbot_rviz_plugins
 {
@@ -41,6 +43,7 @@ public:
 
 private Q_SLOTS:
   void onEStopToggled(bool checked);
+  void onResetPosition();
   void onTeleopToggled(bool checked);
   void onTeleopForward();
   void onTeleopBack();
@@ -59,7 +62,7 @@ private Q_SLOTS:
   void onStopAll();
   void onSaveMap();
   void onDeleteMap();
-  void onOpenCameraView();
+  void onMoveArm();
   void onRefreshMaps();
   void onSpinTimer();
   void onUiTimer();
@@ -80,6 +83,8 @@ private:
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav_action_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr map_save_client_;
+  rclcpp::Client<gazebo_msgs::srv::SetEntityState>::SharedPtr set_entity_state_client_;
+  rclcpp_action::Client<control_msgs::action::FollowJointTrajectory>::SharedPtr arm_action_client_;
 
   nav_msgs::msg::Odometry::SharedPtr latest_odom_;
   std::mutex state_mutex_;
@@ -124,6 +129,8 @@ private:
   QPushButton * teleop_stop_{nullptr};
 
   QTextEdit * log_view_{nullptr};
+
+  QSlider * arm_sliders_[4]{nullptr, nullptr, nullptr, nullptr};
 };
 
 }  // namespace libbot_rviz_plugins

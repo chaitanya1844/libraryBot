@@ -20,6 +20,9 @@ find_package(std_srvs REQUIRED)
 find_package(controller_manager_msgs REQUIRED)
 find_package(rclcpp_action REQUIRED)
 find_package(nav2_msgs REQUIRED)
+find_package(gazebo_msgs REQUIRED)
+find_package(control_msgs REQUIRED)
+find_package(trajectory_msgs REQUIRED)
 
 include_directories(include)
 
@@ -43,6 +46,9 @@ ament_target_dependencies(${PROJECT_NAME}
   controller_manager_msgs
   rclcpp_action
   nav2_msgs
+  gazebo_msgs
+  control_msgs
+  trajectory_msgs
 )
 
 target_link_libraries(${PROJECT_NAME} Qt5::Widgets)

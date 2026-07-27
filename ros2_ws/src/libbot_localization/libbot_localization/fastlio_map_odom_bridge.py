@@ -18,25 +18,33 @@ FAST-LIO2 publishes its estimate on /Odometry as a pose in its own
 fastlio_mapping started, *not* necessarily the 2D map's origin. Two ways
 this node solves for the actual offset between "map" and "camera_init":
 
+0. **Automatic, at startup**: the first time both /Odometry and
+   odom -> base_footprint are available, solves the same equation using
+   the robot's *current* odom-frame pose as the "true" one, so
+   map -> odom starts at identity right then. This matters even for
+   plain mapping (no map/PCD involved yet): camera_init's origin is
+   wherever FAST-LIO2's body/IMU frame physically was at startup, well
+   above the ground (measured ~0.7m on this robot) -- leaving the offset
+   at identity, as an earlier version of this node did, put the entire
+   accumulated point cloud floating at the wrong height relative to the
+   ground-referenced robot model.
 1. **ICP against a saved PCD map** (set the `pcd_map_path` parameter --
    see pcd_to_2d_map.py for turning that same PCD into the 2D map Nav2's
    costmaps use). Every `icp_period_sec`, the latest body-frame scan
    (/cloud_registered_body) is transformed into the current best "map"
    guess and registered against the saved map with Open3D point-to-point
    ICP; a good-fitness result corrects `map -> camera_init` right then.
-   This is the real fix -- continuous, self-correcting, matches how
-   FAST-LIO-LOCALIZATION (github hku-mars ecosystem, ROS1/Python2 only,
-   not usable here directly) fuses a low-rate global correction with
-   FAST-LIO's own high-rate odometry.
+   This is the real fix for *localizing against a previous map* --
+   continuous, self-correcting, matches how FAST-LIO-LOCALIZATION
+   (github hku-mars ecosystem, ROS1/Python2 only, not usable here
+   directly) fuses a low-rate global correction with FAST-LIO's own
+   high-rate odometry.
 2. **One-shot from RViz's "2D Pose Estimate"** (always available, no PCD
    needed): publishes once on /initialpose, solves
    `map -> camera_init = (map -> true_body_now) * inverse(camera_init -> body_now)`
-   and holds it fixed. Good enough with no drift, or as the initial seed
-   ICP refines from afterward, or as a manual correction if ICP ever
-   drifts/loses track.
-
-Before either has run, the offset defaults to identity -- correct only
-if the robot happens to already be sitting at the map's origin pose.
+   and holds it fixed. Same equation as the automatic startup correction,
+   just re-triggerable any time (e.g. as a manual correction if ICP ever
+   drifts/loses track).
 
 Run this instead of AMCL (nav2_amcl), alongside map_server (still needed
 to serve the static map for Nav2's costmaps) and FAST-LIO2 itself -- see
@@ -96,9 +104,19 @@ class FastLioMapOdomBridge(Node):
         self._tf_listener = TransformListener(self._tf_buffer, self)
         self._broadcaster = TransformBroadcaster(self)
 
-        # map -> camera_init, solved for by ICP and/or /initialpose (see
-        # _run_icp / _on_initial_pose); identity until either has run.
+        # map -> camera_init: identity is WRONG as a starting value, not
+        # just a placeholder -- camera_init's origin is wherever FAST-LIO2's
+        # body (IMU) frame physically was when fastlio_mapping started,
+        # which sits well above the ground (the IMU's mount height, e.g.
+        # ~0.7m+ on this robot), not at floor level like odom/map. Leaving
+        # this at identity was measured putting the whole accumulated map
+        # cloud floating ~0.7m off from the ground-referenced robot model.
+        # _auto_align_once (below) corrects it automatically from the
+        # first real odom -> base_footprint + camera_init -> body pair
+        # instead of waiting for a manual "2D Pose Estimate" click or ICP
+        # (both of which still work afterward to refine further).
         self._map_to_camera_init = np.eye(4)
+        self._auto_aligned = False
         self._latest_camera_init_to_body = None
         self._latest_body_scan = None
 
@@ -185,6 +203,35 @@ class FastLioMapOdomBridge(Node):
         self._latest_camera_init_to_body = pose_to_matrix(
             msg.pose.pose.position, msg.pose.pose.orientation)
 
+        try:
+            odom_to_base = self._tf_buffer.lookup_transform(
+                self._odom_frame, self._base_frame, Time())
+        except Exception as exc:
+            self.get_logger().warn(
+                'no %s->%s yet (EKF not up?): %s' % (self._odom_frame, self._base_frame, exc),
+                throttle_duration_sec=2.0)
+            return
+        odom_to_base_m = transform_to_matrix(odom_to_base.transform)
+
+        if not self._auto_aligned:
+            # First real pair of (camera_init -> body, odom -> base) seen --
+            # solve map -> camera_init so that map -> odom starts at
+            # identity right now (this run defines the map, so "wherever
+            # the robot currently is" is as good a map origin as any),
+            # instead of leaving camera_init's arbitrary IMU-height-relative
+            # origin baked into every point in the accumulated cloud. Still
+            # treats "body" (FAST-LIO2's IMU frame) as interchangeable with
+            # "base" (base_footprint) -- the same approximation the rest of
+            # this bridge already makes -- but that only costs a small,
+            # fixed, roughly-known bias; leaving z at identity cost the
+            # IMU's full mount height (~0.7m on this robot, measured).
+            self._map_to_camera_init = odom_to_base_m @ np.linalg.inv(self._latest_camera_init_to_body)
+            self._auto_aligned = True
+            self.get_logger().info(
+                'Auto-aligned map<->camera_init from current odom->%s pose '
+                '(z-corrected -- use "2D Pose Estimate" or ICP to refine further).'
+                % self._base_frame)
+
         # Also broadcast map->camera_init directly (not just folded into
         # map->odom below) so RViz can place FAST-LIO2's own outputs that
         # are stamped in its "camera_init" frame -- /cloud_registered,
@@ -199,17 +246,7 @@ class FastLioMapOdomBridge(Node):
         matrix_to_transform(self._map_to_camera_init, camera_init_out)
         self._broadcaster.sendTransform(camera_init_out)
 
-        try:
-            odom_to_base = self._tf_buffer.lookup_transform(
-                self._odom_frame, self._base_frame, Time())
-        except Exception as exc:
-            self.get_logger().warn(
-                'no %s->%s yet (EKF not up?): %s' % (self._odom_frame, self._base_frame, exc),
-                throttle_duration_sec=2.0)
-            return
-
         map_to_body = self._map_to_camera_init @ self._latest_camera_init_to_body
-        odom_to_base_m = transform_to_matrix(odom_to_base.transform)
         map_to_odom = map_to_body @ np.linalg.inv(odom_to_base_m)
 
         out = TransformStamped()
