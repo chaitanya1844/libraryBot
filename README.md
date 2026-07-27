@@ -41,7 +41,7 @@ ros2_ws/src/
 ├── libbot_gazebo_plugins     Link-attacher Gazebo world plugin (AttachLink/DetachLink services) for pick/place
 ├── libbot_control            mecanum_drive_controller + arm_controller + joint_state_broadcaster (ros2_control) config/launch
 ├── libbot_manipulation        book_catalog.yaml, shelf_catalog.yaml, the Nav2+arm task manager (task_manager_node.py)
-├── libbot_localization        robot_localization EKF + AMCL config/launch, plus FAST-LIO2 3D lidar-inertial localization
+├── libbot_localization        robot_localization EKF + FAST-LIO2 (3D lidar-inertial) localization config/launch
 ├── libbot_mapping             SLAM Toolbox config/launch + the bundled default map
 ├── libbot_navigation           Nav2 params (holonomic DWB tuning) + launch + RViz config
 ├── libbot_perception            Lidar->2D scan, 3D-lidar-to-Velodyne-format adapter (for FAST-LIO2)
@@ -83,9 +83,9 @@ ros2 launch libbot_bringup simulation.launch.py
 
 This starts Gazebo, the robot, controllers, lidar processing, the EKF,
 and RViz (with the "libraryBot Controls" panel docked in it) -- but
-**does not** start SLAM or AMCL yet. Nothing owns `map -> odom` and Nav2
-isn't running until you say so, on purpose (see "Map, localize, navigate
-workflow" below for why and how).
+**does not** start SLAM or localization yet. Nothing owns `map -> odom`
+and Nav2 isn't running until you say so, on purpose (see "Map, localize,
+navigate workflow" below for why and how).
 
 Useful variations:
 
@@ -108,11 +108,14 @@ two things fighting over the `map -> odom` transform:
    with the Xbox controller (see "Xbox controller teleop" below) until
    the Map display in RViz looks complete, then click **Save Map**
    (writes over `libbot_mapping/maps/library.yaml`/`.pgm`).
-2. **2. Start Localization** -- stops SLAM, starts AMCL against the
-   saved map. Check RViz: the particle cloud (enable the `AMCLParticles`
-   display) should converge tightly around the robot's actual pose. If
-   it doesn't, use RViz's **2D Pose Estimate** tool to give AMCL a nudge
-   in the right place.
+2. **2. Start Localization** -- stops SLAM, starts localization against
+   the saved map via FAST-LIO2 (3D lidar-inertial odometry) instead of
+   AMCL -- running two localization sources at once (2D scan-matching
+   and 3D lidar-inertial) would be redundant, and FAST-LIO2 is what the
+   3D lidar is actually for. Check RViz: enable the `FastLioCloud`/
+   `FastLioPath` displays (on by default) to see it tracking. See "3D
+   localization" below for the details and the one-time build step it
+   needs.
 3. **3. Start Navigation** -- brings up Nav2 (planner/controller/
    behaviors) on top of the localization from step 2. Add
    `collect_books:=true` (`ros2 launch libbot_bringup autonomy.launch.py
@@ -140,8 +143,8 @@ call `configure()` on a Nav2 server before that server had finished
 loading its own plugins (DWB's critics, in particular), and
 `lifecycle_manager` does not retry -- it aborts with `Failed to bring up
 all requested nodes`, even though the server itself finishes configuring
-correctly a moment later. The same race can hit AMCL/map_server's
-lifecycle manager under heavy load too. Both `navigation.launch.py` and
+correctly a moment later. The same race can hit the localization stage's
+map_server lifecycle manager under heavy load too. Both `navigation.launch.py` and
 `localization.launch.py` already start their lifecycle managers a few
 seconds after their managed nodes to give this a head start, and
 `autonomy.launch.py`/the panel's mode buttons launch Nav2 as an
@@ -190,15 +193,17 @@ Three things worth knowing if you touch this stack:
 
 ## 3D localization (FAST-LIO2)
 
-The 3D lidar (`/libbot/lidar_3d/points`) is otherwise only ever
-flattened to 2D via `pointcloud_to_laserscan` for AMCL/Nav2's costmaps.
-To actually see 3D lidar-inertial localization working, this repo wires
-up [FAST-LIO2](https://github.com/hku-mars/FAST_LIO/tree/ROS2) (tightly-
+The 3D lidar (`/libbot/lidar_3d/points`) used to only ever get flattened
+to 2D via `pointcloud_to_laserscan` for costmaps, with AMCL doing the
+actual localization from that flattened scan. This repo now uses
+[FAST-LIO2](https://github.com/hku-mars/FAST_LIO/tree/ROS2) (tightly-
 coupled LiDAR-IMU odometry via an iterated Kalman filter + incremental
-k-d tree) instead of a full SLAM stack like rtabmap -- rtabmap's GTSAM
-factor-graph backend is real weight for what's a fairly small, bounded
-environment, and the goal here includes eventually running on a Jetson
-Nano Super, where that weight matters.
+k-d tree) as Nav2's real localization source instead of AMCL -- running
+both would be redundant (two independent global-pose estimators), and
+FAST-LIO2 is what the 3D lidar is actually for. It was chosen over a
+full SLAM stack like rtabmap specifically for being light enough to
+eventually run on a Jetson Nano Super; rtabmap's GTSAM factor-graph
+backend is real weight for what's a fairly small, bounded environment.
 
 ![FAST-LIO2 tracking the robot's live trajectory in RViz](docs/fastlio_3d_map.png)
 
@@ -217,11 +222,10 @@ git clone --recursive --branch ROS2 https://github.com/hku-mars/FAST_LIO.git
 #   Livox-SDK2 somewhere else)
 cd ~/fastlio_ws && colcon build --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humble
 
-# Every run:
+# Every run, before "2. Start Localization" (or standalone):
 source /opt/ros/humble/setup.bash
 source ~/fastlio_ws/install/setup.bash
 source ~/libraryBot/ros2_ws/install/setup.bash
-ros2 launch libbot_localization localization_3d.launch.py
 ```
 
 Two adaptations were needed to point FAST-LIO2 (built for real spinning
@@ -240,11 +244,25 @@ mechanical lidars) at this project's simulated sensor:
   are on fixed, axis-aligned joints relative to `base_link`) rather than
   calibrated, since this is simulation.
 
-FAST-LIO2 publishes its own odometry (`/Odometry`, frame `camera_init`
--> `body`) independent of the EKF's `odom` frame used by the 2D AMCL/Nav2
-stack, so it can run alongside `simulation.launch.py` without fighting
-over a TF frame -- this is a standalone 3D localization/mapping demo, not
-merged into Nav2's costmaps.
+Two launch files, two purposes:
+
+- **`localization_fastlio.launch.py`** -- what "2. Start Localization"
+  actually runs now. Bundles `map_server` (Nav2's costmaps still need
+  the static 2D map regardless of what does localization) + the lidar
+  adapter + FAST-LIO2 + `fastlio_map_odom_bridge.py`, which turns
+  FAST-LIO2's own pose estimate (published on `/Odometry`, in FAST-LIO2's
+  own `camera_init` frame) into the actual `map -> odom` transform Nav2
+  looks for: `map -> odom = (map -> body) * inverse(odom -> base_footprint)`,
+  composed against the EKF's existing, continuous `odom -> base_footprint`
+  so the local costmap doesn't jump every time the global estimate
+  updates -- the same role AMCL used to play. This relies on FAST-LIO2
+  initializing at the same pose the map/spawn convention already
+  assumes (see `simulation.launch.py`'s spawn `x`/`y`/`yaw` args).
+- **`localization_3d.launch.py`** -- just the lidar adapter + FAST-LIO2
+  on their own, no map_server/bridge/Nav2 integration. Useful for
+  watching FAST-LIO2 build its point-cloud map and track a trajectory in
+  isolation (`/cloud_registered`, `/path`, `/Odometry`) without bringing
+  up the rest of the localization stack.
 
 ## Control panel
 
@@ -385,7 +403,6 @@ Everything you're likely to want to tune, and where it lives:
 | Canonical velocity command topic | `/libbot/mecanum_drive_controller/reference_unstamped` (`geometry_msgs/Twist`) -- Nav2, teleop, and the control panel all publish here |
 | Spawn location | `libbot_gazebo/launch/spawn_robot.launch.py` args `x`/`y`/`yaw`, also `libbot_bringup/launch/simulation.launch.py` |
 | EKF sensor fusion weights | `libbot_localization/config/ekf.yaml` |
-| AMCL particle filter tuning | `libbot_localization/config/amcl.yaml` |
 | SLAM Toolbox mapping density | `libbot_mapping/config/slam_toolbox_online_async.yaml` |
 | Nav2: velocity/accel limits, critics, costmaps, BT | `libbot_navigation/config/nav2_params.yaml` |
 | Which books exist / their approach pose | `libbot_manipulation/config/book_catalog.yaml` -- must match book props in `libbot_gazebo/worlds/library.world` |
@@ -502,9 +519,9 @@ testing. Check `/libbot/model_states` for its actual pose (it's easy to
 drift a long way from spawn during ad hoc teleop testing) and either
 drive it back out or respawn.
 
-**AMCL/Nav2 can't plan to a goal you know is reachable** The bundled
-map is small and partial (see "What's simulated vs. simplified"). Build
-a fuller map first (see "Mapping mode").
+**Nav2 can't plan to a goal you know is reachable** The bundled map is
+small and partial (see "What's simulated vs. simplified"). Build a
+fuller map first (see "Mapping mode").
 
 ## Manual testing cheatsheet
 
