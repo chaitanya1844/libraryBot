@@ -23,6 +23,20 @@
     </joint>
   </xacro:macro>
 
+  <!-- State-only (no command_interface): gripper_joint is a zero-range
+       revolute joint (arm.urdf.xacro), never actively driven, but it
+       still needs to be registered here so joint_state_broadcaster
+       reports it, since otherwise robot_state_publisher never receives
+       a state for it and silently drops wrist_link to gripper_link from
+       TF entirely, breaking RobotModel rendering for the whole arm past
+       the wrist (and anything the link-attacher plugin welds there). -->
+  <xacro:macro name="libbot_passive_ros2_control_joint" params="name">
+    <joint name="${name}">
+      <state_interface name="position"/>
+      <state_interface name="velocity"/>
+    </joint>
+  </xacro:macro>
+
   <ros2_control name="libbot_gazebo_system" type="system">
     <hardware>
       <plugin>gazebo_ros2_control/GazeboSystem</plugin>
@@ -35,6 +49,7 @@
     <xacro:libbot_arm_ros2_control_joint name="shoulder_lift_joint" lower="-1.6" upper="1.2"/>
     <xacro:libbot_arm_ros2_control_joint name="elbow_joint" lower="-2.2" upper="1.8"/>
     <xacro:libbot_arm_ros2_control_joint name="wrist_pitch_joint" lower="-1.6" upper="1.6"/>
+    <xacro:libbot_passive_ros2_control_joint name="gripper_joint"/>
   </ros2_control>
 
   <gazebo>

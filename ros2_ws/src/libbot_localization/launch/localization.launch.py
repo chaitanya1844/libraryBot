@@ -1,10 +1,19 @@
-"""EKF (always) + optionally AMCL against a saved map.
+"""EKF (always) + optionally full localization against a saved map.
 
 TF ownership:
     robot_state_publisher : base_footprint -> base_link -> sensor frames
     EKF (this launch)      : odom -> base_footprint
-    AMCL (if enabled)      : map -> odom
-    slam_toolbox (mapping) : map -> odom   (mutually exclusive with AMCL)
+    FAST-LIO2 (if enabled)  : map -> odom, via fastlio_map_odom_bridge
+                              (see localization_fastlio.launch.py)
+    slam_toolbox (mapping) : map -> odom   (mutually exclusive with the above)
+
+`use_amcl` is a legacy name kept for backward compatibility with
+existing callers (simulation.launch.py, switch_mode.sh) -- it no longer
+starts nav2_amcl. AMCL was replaced with FAST-LIO2 (3D lidar-inertial
+odometry) as the actual localization source; see
+localization_fastlio.launch.py and the README's "3D localization"
+section for why (redundant to run two localization sources at once, and
+this is what the 3D lidar is actually for).
 
     ros2 launch libbot_localization localization.launch.py
     ros2 launch libbot_localization localization.launch.py use_amcl:=true map:=/path/to/map.yaml
@@ -13,8 +22,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, TimerAction
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.conditions import IfCondition
+from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
 
@@ -26,17 +36,15 @@ def generate_launch_description():
     use_amcl = LaunchConfiguration('use_amcl')
     map_yaml = LaunchConfiguration('map')
     ekf_config = LaunchConfiguration('ekf_config')
-    amcl_config = LaunchConfiguration('amcl_config')
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('use_amcl', default_value='false',
-                               description='Localize against a saved map with AMCL. '
+                               description='Localize against a saved map with FAST-LIO2. '
                                             'Leave false while mapping with slam_toolbox.'),
         DeclareLaunchArgument('map', default_value=os.path.join(
             get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
         DeclareLaunchArgument('ekf_config', default_value=os.path.join(pkg_share, 'config', 'ekf.yaml')),
-        DeclareLaunchArgument('amcl_config', default_value=os.path.join(pkg_share, 'config', 'amcl.yaml')),
 
         Node(
             package='robot_localization',
@@ -46,40 +54,10 @@ def generate_launch_description():
             parameters=[ekf_config, {'use_sim_time': use_sim_time}],
         ),
 
-        Node(
-            package='nav2_map_server',
-            executable='map_server',
-            name='map_server',
-            output='screen',
-            parameters=[{'yaml_filename': map_yaml, 'use_sim_time': use_sim_time}],
+        IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(os.path.join(
+                pkg_share, 'launch', 'localization_fastlio.launch.py')),
+            launch_arguments={'use_sim_time': use_sim_time, 'map': map_yaml}.items(),
             condition=IfCondition(use_amcl),
         ),
-        Node(
-            package='nav2_amcl',
-            executable='amcl',
-            name='amcl',
-            output='screen',
-            parameters=[amcl_config, {'use_sim_time': use_sim_time}],
-            condition=IfCondition(use_amcl),
-        ),
-        # Delayed relative to map_server/amcl above: calling configure()
-        # before they've finished constructing their own lifecycle
-        # services is a real race under system load -- lifecycle_manager
-        # fails fast rather than retrying (see libbot_navigation's
-        # navigation.launch.py for the same issue and README "Two-stage
-        # bringup" / "Lifecycle manager races" for the full story).
-        TimerAction(period=4.0, actions=[
-            Node(
-                package='nav2_lifecycle_manager',
-                executable='lifecycle_manager',
-                name='lifecycle_manager_localization',
-                output='screen',
-                parameters=[{
-                    'use_sim_time': use_sim_time,
-                    'autostart': True,
-                    'node_names': ['map_server', 'amcl'],
-                }],
-                condition=IfCondition(use_amcl),
-            ),
-        ]),
     ])

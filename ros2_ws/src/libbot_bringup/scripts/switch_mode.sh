@@ -13,7 +13,14 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml}"
 # Everything that could own map->odom, plus the full Nav2 autonomy stack
 # that sits on top of localization. Matches the same process-name
 # patterns used throughout this repo's own testing/cleanup.
-STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|rfid_reader_node|shelf_slot_detector_node|task_manager_node"
+STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge"
+
+# FAST-LIO2 replaced AMCL as the localization source (see
+# libbot_localization/launch/localization_fastlio.launch.py) -- it lives
+# in a separate ~/fastlio_ws overlay workspace since it isn't packaged
+# for apt, so it has to be sourced here explicitly, on top of whatever
+# ROS/libraryBot environment this script inherited.
+FASTLIO_WS_SETUP="$HOME/fastlio_ws/install/setup.bash"
 
 stop_stack() {
   pkill -9 -f "$STOP_PATTERN" 2>/dev/null || true
@@ -27,7 +34,12 @@ case "$MODE" in
     ;;
   localization)
     stop_stack
-    ros2 launch libbot_localization localization.launch.py use_amcl:=true "map:=${MAP_PATH}" &
+    if [ -f "$FASTLIO_WS_SETUP" ]; then
+      source "$FASTLIO_WS_SETUP"
+    else
+      echo "switch_mode.sh: $FASTLIO_WS_SETUP not found -- see README '3D localization' to build it" >&2
+    fi
+    ros2 launch libbot_localization localization_fastlio.launch.py "map:=${MAP_PATH}" &
     ;;
   navigation)
     # Additive on top of an already-running localization stage -- does

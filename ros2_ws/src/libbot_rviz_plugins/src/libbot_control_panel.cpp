@@ -144,7 +144,8 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
     "(<code>ros2 launch libbot_control teleop_joy.launch.py</code>, hold LB) "
     "until the map looks complete in RViz, then Save Map.<br>"
     "2. Start Localization to load the saved map and locate the robot on "
-    "it (AMCL) -- check the particle cloud converges in RViz.<br>"
+    "it via FAST-LIO2 (3D lidar-inertial odometry) -- enable the "
+    "FastLioCloud/FastLioPath displays in RViz to check it's tracking.<br>"
     "3. Start Navigation to bring up Nav2. Then use RViz's own "
     "\"2D Pose Estimate\" tool to set where the robot starts and "
     "\"Nav2 Goal\" to send it anywhere on the map.</small>");
@@ -384,7 +385,7 @@ void LibbotControlPanel::onStartLocalization()
 {
   QString map_path = QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml";
   QProcess::startDetached("bash", {"-c", switchModeScript() + " localization " + map_path});
-  log("Stopping mapping, starting localization (AMCL) against the saved map...");
+  log("Stopping mapping, starting localization (FAST-LIO2) against the saved map...");
 }
 
 void LibbotControlPanel::onStartNavigation()
