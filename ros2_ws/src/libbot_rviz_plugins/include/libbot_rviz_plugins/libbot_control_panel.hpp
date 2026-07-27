@@ -16,6 +16,7 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_srvs/srv/set_bool.hpp"
+#include "std_srvs/srv/trigger.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
 #include "nav2_msgs/action/navigate_to_pose.hpp"
 
@@ -52,7 +53,12 @@ private Q_SLOTS:
   void onStartMapping();
   void onStartLocalization();
   void onStartNavigation();
+  void onStopMapping();
+  void onStopLocalization();
+  void onStopNavigation();
+  void onStopAll();
   void onSaveMap();
+  void onDeleteMap();
   void onOpenCameraView();
   void onRefreshMaps();
   void onSpinTimer();
@@ -61,8 +67,11 @@ private Q_SLOTS:
 private:
   void setEStop(bool engaged);
   void setTeleopButtonsEnabled(bool enabled);
+  void updateModeButtons();
+  void setSavingUi(bool saving, const QString & status = QString());
   void log(const QString & text);
   QString mapsDir() const;
+  QString pcdPath() const;
   QString selectedMapYamlPath() const;
 
   rclcpp::Node::SharedPtr node_;
@@ -70,6 +79,7 @@ private:
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav_action_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr map_save_client_;
 
   nav_msgs::msg::Odometry::SharedPtr latest_odom_;
   std::mutex state_mutex_;
@@ -79,6 +89,13 @@ private:
   bool teleop_key_held_{false};
   geometry_msgs::msg::Twist teleop_cmd_;
 
+  bool mapping_active_{false};
+  bool localization_active_{false};
+  bool navigation_active_{false};
+  bool saving_map_{false};
+  QString pending_map_name_;
+  QProcess * convert_process_{nullptr};
+
   QTimer * spin_timer_{nullptr};
   QTimer * ui_timer_{nullptr};
 
@@ -87,6 +104,13 @@ private:
 
   // map selection (localization/navigation) + save-as name
   QComboBox * map_combo_{nullptr};
+  QPushButton * save_map_button_{nullptr};
+  QPushButton * start_mapping_button_{nullptr};
+  QPushButton * start_localization_button_{nullptr};
+  QPushButton * start_navigation_button_{nullptr};
+  QPushButton * stop_mapping_button_{nullptr};
+  QPushButton * stop_localization_button_{nullptr};
+  QPushButton * stop_navigation_button_{nullptr};
 
   // manual drive
   QPushButton * estop_button_{nullptr};

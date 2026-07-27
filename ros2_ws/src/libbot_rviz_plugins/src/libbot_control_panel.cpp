@@ -122,48 +122,50 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   root->addWidget(camera_box);
 
   // ---------------- mode: Map -> Localize -> Navigate ----------------
-  auto * mode_box = new QGroupBox("Mode (do these in order, each stops the previous one)");
+  auto * mode_box = new QGroupBox("Mode");
   auto * mode_grid = new QGridLayout(mode_box);
 
-  auto * map_label = new QLabel("Map:");
   map_combo_ = new QComboBox();
-  map_combo_->setToolTip(
-    "Which saved map Start Localization/Navigation use. Refreshed automatically "
-    "after Save Map, or click Refresh Maps after adding one outside this panel.");
-  auto * refresh_maps_btn = new QPushButton("Refresh Maps");
+  auto * refresh_maps_btn = new QPushButton("Refresh");
+  auto * delete_map_btn = new QPushButton("Delete");
   connect(refresh_maps_btn, &QPushButton::clicked, this, &LibbotControlPanel::onRefreshMaps);
-  mode_grid->addWidget(map_label, 0, 0);
+  connect(delete_map_btn, &QPushButton::clicked, this, &LibbotControlPanel::onDeleteMap);
+  mode_grid->addWidget(new QLabel("Map:"), 0, 0);
   mode_grid->addWidget(map_combo_, 0, 1);
   mode_grid->addWidget(refresh_maps_btn, 0, 2);
+  mode_grid->addWidget(delete_map_btn, 0, 3);
 
-  auto * step1 = new QPushButton("1. Start Mapping");
-  auto * step1b = new QPushButton("Save Map As...");
-  auto * step2 = new QPushButton("2. Start Localization");
-  auto * step3 = new QPushButton("3. Start Navigation");
-  connect(step1, &QPushButton::clicked, this, &LibbotControlPanel::onStartMapping);
-  connect(step1b, &QPushButton::clicked, this, &LibbotControlPanel::onSaveMap);
-  connect(step2, &QPushButton::clicked, this, &LibbotControlPanel::onStartLocalization);
-  connect(step3, &QPushButton::clicked, this, &LibbotControlPanel::onStartNavigation);
+  start_mapping_button_ = new QPushButton("Start Mapping");
+  stop_mapping_button_ = new QPushButton("Stop");
+  save_map_button_ = new QPushButton("Save Map As...");
+  connect(start_mapping_button_, &QPushButton::clicked, this, &LibbotControlPanel::onStartMapping);
+  connect(stop_mapping_button_, &QPushButton::clicked, this, &LibbotControlPanel::onStopMapping);
+  connect(save_map_button_, &QPushButton::clicked, this, &LibbotControlPanel::onSaveMap);
+  mode_grid->addWidget(start_mapping_button_, 1, 0, 1, 2);
+  mode_grid->addWidget(stop_mapping_button_, 1, 2);
+  mode_grid->addWidget(save_map_button_, 1, 3);
 
-  mode_grid->addWidget(step1, 1, 0);
-  mode_grid->addWidget(step1b, 1, 1, 1, 2);
-  mode_grid->addWidget(step2, 2, 0, 1, 3);
-  mode_grid->addWidget(step3, 3, 0, 1, 3);
+  start_localization_button_ = new QPushButton("Start Localization");
+  stop_localization_button_ = new QPushButton("Stop");
+  connect(start_localization_button_, &QPushButton::clicked, this, &LibbotControlPanel::onStartLocalization);
+  connect(stop_localization_button_, &QPushButton::clicked, this, &LibbotControlPanel::onStopLocalization);
+  mode_grid->addWidget(start_localization_button_, 2, 0, 1, 3);
+  mode_grid->addWidget(stop_localization_button_, 2, 3);
 
-  auto * mode_help = new QLabel(
-    "<small>1. Start Mapping, then drive around with the Xbox controller "
-    "(<code>ros2 launch libbot_control teleop_joy.launch.py</code>, hold LB) "
-    "until the map looks complete in RViz, then Save Map As... (pick a name).<br>"
-    "2. Pick a map above, then Start Localization to load it and locate the "
-    "robot on it via FAST-LIO2 (3D lidar-inertial odometry) -- enable the "
-    "FastLioCloud/FastLioPath displays in RViz to check it's tracking.<br>"
-    "3. Start Navigation to bring up Nav2. Then use RViz's own "
-    "\"2D Pose Estimate\" tool to set where the robot starts and "
-    "\"Nav2 Goal\" to send it anywhere on the map.</small>");
-  mode_help->setWordWrap(true);
-  mode_grid->addWidget(mode_help, 4, 0, 1, 3);
+  start_navigation_button_ = new QPushButton("Start Navigation");
+  stop_navigation_button_ = new QPushButton("Stop");
+  connect(start_navigation_button_, &QPushButton::clicked, this, &LibbotControlPanel::onStartNavigation);
+  connect(stop_navigation_button_, &QPushButton::clicked, this, &LibbotControlPanel::onStopNavigation);
+  mode_grid->addWidget(start_navigation_button_, 3, 0, 1, 3);
+  mode_grid->addWidget(stop_navigation_button_, 3, 3);
+
+  auto * stop_all_btn = new QPushButton("STOP EVERYTHING");
+  stop_all_btn->setStyleSheet("QPushButton { background-color: #922b21; color: white; font-weight: bold; }");
+  connect(stop_all_btn, &QPushButton::clicked, this, &LibbotControlPanel::onStopAll);
+  mode_grid->addWidget(stop_all_btn, 4, 0, 1, 4);
 
   root->addWidget(mode_box);
+  updateModeButtons();
 
   // ---------------- log ----------------
   auto * log_box = new QGroupBox("Log");
@@ -202,6 +204,8 @@ void LibbotControlPanel::onInitialize()
 
   nav_action_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
     node_, "/navigate_to_pose");
+
+  map_save_client_ = node_->create_client<std_srvs::srv::Trigger>("/map_save");
 
   spin_timer_ = new QTimer(this);
   connect(spin_timer_, &QTimer::timeout, this, &LibbotControlPanel::onSpinTimer);
@@ -261,9 +265,7 @@ void LibbotControlPanel::setEStop(bool engaged)
   cmd_pub_->publish(zero);
 
   if (!switch_controller_client_->service_is_ready()) {
-    log(engaged
-      ? "E-stop engaged (controller_manager not reachable -- zero Twist only)"
-      : "E-stop released (controller_manager not reachable)");
+    log(engaged ? "E-stop engaged (zero Twist only)" : "E-stop released");
     return;
   }
   auto req = std::make_shared<controller_manager_msgs::srv::SwitchController::Request>();
@@ -274,8 +276,7 @@ void LibbotControlPanel::setEStop(bool engaged)
   }
   req->strictness = controller_manager_msgs::srv::SwitchController::Request::BEST_EFFORT;
   switch_controller_client_->async_send_request(req);
-  log(engaged ? "E-stop engaged: drive controller deactivated"
-              : "E-stop released: drive controller reactivated");
+  log(engaged ? "E-stop engaged" : "E-stop released");
 }
 
 void LibbotControlPanel::onTeleopToggled(bool checked)
@@ -287,15 +288,13 @@ void LibbotControlPanel::onTeleopToggled(bool checked)
   if (checked) {
     if (nav_action_client_ && nav_action_client_->action_server_is_ready()) {
       nav_action_client_->async_cancel_all_goals();
-      log("Teleop override engaged: canceled any active Nav2 goal");
-    } else {
-      log("Teleop override engaged (Nav2 action server not reachable -- nothing to cancel)");
     }
+    log("Teleop override engaged");
   } else {
     teleop_key_held_ = false;
     teleop_cmd_ = geometry_msgs::msg::Twist();
     cmd_pub_->publish(teleop_cmd_);
-    log("Teleop override released -- send a new Nav2 goal to resume autonomous driving");
+    log("Teleop override released");
   }
 }
 
@@ -384,50 +383,117 @@ void LibbotControlPanel::onOpenCameraView()
 {
   QProcess::startDetached(
     "bash", {"-c", "ros2 run rqt_image_view rqt_image_view /libbot/camera/camera/image_raw"});
-  log("Opening camera view (rqt_image_view) in a separate window...");
+  log("Opening camera view...");
 }
 
 void LibbotControlPanel::onStartMapping()
 {
   QProcess::startDetached("bash", {"-c", switchModeScript() + " mapping"});
-  log("Stopping any localization/navigation, starting mapping (SLAM)...");
+  mapping_active_ = true;
+  localization_active_ = false;
+  navigation_active_ = false;
+  updateModeButtons();
+  log("Mapping started");
 }
 
 void LibbotControlPanel::onStartLocalization()
 {
   QString map_path = selectedMapYamlPath();
   if (map_path.isEmpty()) {
-    log("No map selected -- pick one from the Map dropdown (or Save Map As... first)");
+    log("No map selected");
     return;
   }
   QProcess::startDetached("bash", {"-c", switchModeScript() + " localization \"" + map_path + "\""});
-  log("Stopping mapping, starting localization (FAST-LIO2) against '" +
-      map_combo_->currentText() + "'...");
+  mapping_active_ = false;
+  localization_active_ = true;
+  navigation_active_ = false;
+  updateModeButtons();
+  log("Localization started against '" + map_combo_->currentText() + "'");
 }
 
 void LibbotControlPanel::onStartNavigation()
 {
   QProcess::startDetached("bash", {"-c", switchModeScript() + " navigation"});
-  log("Starting Nav2 (requires localization already running)");
+  navigation_active_ = true;
+  updateModeButtons();
+  log("Navigation started");
+}
+
+void LibbotControlPanel::onStopMapping()
+{
+  QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
+  mapping_active_ = false;
+  updateModeButtons();
+  log("Mapping stopped");
+}
+
+void LibbotControlPanel::onStopLocalization()
+{
+  QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
+  localization_active_ = false;
+  navigation_active_ = false;
+  updateModeButtons();
+  log("Localization stopped");
+}
+
+void LibbotControlPanel::onStopNavigation()
+{
+  QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
+  navigation_active_ = false;
+  updateModeButtons();
+  log("Navigation stopped");
+}
+
+void LibbotControlPanel::onStopAll()
+{
+  QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
+  mapping_active_ = false;
+  localization_active_ = false;
+  navigation_active_ = false;
+  updateModeButtons();
+  log("Everything stopped");
+}
+
+void LibbotControlPanel::updateModeButtons()
+{
+  if (start_mapping_button_) start_mapping_button_->setEnabled(!saving_map_);
+  if (stop_mapping_button_) stop_mapping_button_->setEnabled(mapping_active_);
+  if (save_map_button_) save_map_button_->setEnabled(mapping_active_ && !saving_map_);
+
+  if (start_localization_button_) start_localization_button_->setEnabled(!mapping_active_ && !saving_map_);
+  if (stop_localization_button_) stop_localization_button_->setEnabled(localization_active_);
+
+  if (start_navigation_button_) start_navigation_button_->setEnabled(localization_active_ && !mapping_active_);
+  if (stop_navigation_button_) stop_navigation_button_->setEnabled(navigation_active_);
+}
+
+void LibbotControlPanel::setSavingUi(bool saving, const QString & status)
+{
+  saving_map_ = saving;
+  if (save_map_button_) {
+    save_map_button_->setText(saving ? "Saving..." : "Save Map As...");
+  }
+  updateModeButtons();
+  if (!status.isEmpty()) {
+    log(status);
+  }
 }
 
 void LibbotControlPanel::onSaveMap()
 {
   bool ok = false;
   QString name = QInputDialog::getText(
-    this, "Save Map As", "Map name (no extension):", QLineEdit::Normal, "library", &ok);
+    this, "Save Map As", "Map name:", QLineEdit::Normal, "library", &ok);
   if (!ok) {
     return;
   }
   name = name.trimmed();
   if (name.isEmpty()) {
-    log("Save Map cancelled: name was empty");
     return;
   }
   static const QRegularExpression valid_name("^[A-Za-z0-9_-]+$");
   if (!valid_name.match(name).hasMatch()) {
-    log("Save Map cancelled: name must be letters/numbers/underscore/hyphen only "
-        "(no spaces or slashes) -- got '" + name + "'");
+    log("Invalid name: letters/numbers/underscore/hyphen only");
     return;
   }
   QString dest = mapsDir() + "/" + name;
@@ -436,22 +502,71 @@ void LibbotControlPanel::onSaveMap()
       this, "Overwrite Map?", "'" + name + "' already exists. Overwrite it?",
       QMessageBox::Yes | QMessageBox::No);
     if (reply != QMessageBox::Yes) {
-      log("Save Map cancelled: '" + name + "' already exists");
       return;
     }
   }
-  QProcess::startDetached("ros2", {"run", "nav2_map_server", "map_saver_cli", "-f", dest});
-  log("Saving map as '" + name + "'...");
-  // map_saver_cli runs detached (fire-and-forget, matches the rest of this
-  // panel's process launches); give it a moment to actually write the
-  // files before refreshing the dropdown, then select what was just saved.
-  QTimer::singleShot(1500, this, [this, name]() {
-    onRefreshMaps();
-    int idx = map_combo_->findText(name);
-    if (idx >= 0) {
-      map_combo_->setCurrentIndex(idx);
-    }
-  });
+
+  pending_map_name_ = name;
+  setSavingUi(true, "Saving 3D map...");
+
+  if (!map_save_client_->service_is_ready()) {
+    setSavingUi(false, "Save failed: /map_save service not available (is mapping running?)");
+    return;
+  }
+  auto req = std::make_shared<std_srvs::srv::Trigger::Request>();
+  map_save_client_->async_send_request(
+    req, [this](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+      auto resp = future.get();
+      if (!resp->success) {
+        QMetaObject::invokeMethod(this, [this, resp]() {
+          setSavingUi(false, "Save failed: " + QString::fromStdString(resp->message));
+        });
+        return;
+      }
+      QMetaObject::invokeMethod(this, [this]() {
+        log("3D map saved, converting to 2D...");
+        QString name = pending_map_name_;
+        if (convert_process_) {
+          convert_process_->deleteLater();
+        }
+        convert_process_ = new QProcess(this);
+        connect(
+          convert_process_, QOverload<int, QProcess::ExitStatus>::of(&QProcess::finished),
+          this, [this, name](int exit_code, QProcess::ExitStatus) {
+            if (exit_code == 0) {
+              setSavingUi(false, "Map '" + name + "' saved");
+              onRefreshMaps();
+              int idx = map_combo_->findText(name);
+              if (idx >= 0) {
+                map_combo_->setCurrentIndex(idx);
+              }
+            } else {
+              QString err = QString::fromUtf8(convert_process_->readAllStandardError());
+              setSavingUi(false, "2D conversion failed: " + err);
+            }
+          });
+        convert_process_->start(
+          "ros2", {"run", "libbot_mapping", "pcd_to_2d_map.py", pcdPath(), name,
+            "--output-dir", mapsDir()});
+      });
+    });
+}
+
+void LibbotControlPanel::onDeleteMap()
+{
+  QString name = map_combo_->currentText();
+  if (name.isEmpty()) {
+    return;
+  }
+  auto reply = QMessageBox::question(
+    this, "Delete Map", "Delete '" + name + "'?", QMessageBox::Yes | QMessageBox::No);
+  if (reply != QMessageBox::Yes) {
+    return;
+  }
+  QFile::remove(mapsDir() + "/" + name + ".yaml");
+  QFile::remove(mapsDir() + "/" + name + ".pgm");
+  log("Deleted '" + name + "'");
+  onRefreshMaps();
 }
 
 void LibbotControlPanel::onRefreshMaps()
@@ -474,6 +589,11 @@ void LibbotControlPanel::onRefreshMaps()
 QString LibbotControlPanel::mapsDir() const
 {
   return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/maps";
+}
+
+QString LibbotControlPanel::pcdPath() const
+{
+  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd";
 }
 
 QString LibbotControlPanel::selectedMapYamlPath() const
