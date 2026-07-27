@@ -54,6 +54,60 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   estop_v->addWidget(estop_button_);
   root->addWidget(estop_box);
 
+  // ---------------- teleop override ----------------
+  // Nav2's controller_server only publishes cmd_vel while it has an
+  // active goal -- canceling that goal (which this toggle does) leaves
+  // the topic free for these buttons with nothing to fight over, no
+  // need to touch ros2_control like E-STOP does. Toggle off to hand
+  // control back to Nav2 (send it a new goal to resume).
+  auto * teleop_box = new QGroupBox("Teleop Override");
+  auto * teleop_v = new QVBoxLayout(teleop_box);
+  teleop_button_ = new QPushButton("Teleop Override");
+  teleop_button_->setCheckable(true);
+  teleop_button_->setMinimumHeight(40);
+  teleop_button_->setStyleSheet(
+    "QPushButton { background-color: #b9770e; color: white; font-weight: bold; }"
+    "QPushButton:checked { background-color: #7d5109; }");
+  connect(teleop_button_, &QPushButton::toggled, this, &LibbotControlPanel::onTeleopToggled);
+  teleop_v->addWidget(teleop_button_);
+
+  auto * teleop_grid = new QGridLayout();
+  teleop_rotate_ccw_ = new QPushButton("↺ CCW");
+  teleop_forward_ = new QPushButton("↑ Forward");
+  teleop_rotate_cw_ = new QPushButton("↻ CW");
+  teleop_strafe_left_ = new QPushButton("← Strafe");
+  teleop_stop_ = new QPushButton("STOP");
+  teleop_strafe_right_ = new QPushButton("Strafe →");
+  teleop_back_ = new QPushButton("↓ Back");
+  teleop_grid->addWidget(teleop_rotate_ccw_, 0, 0);
+  teleop_grid->addWidget(teleop_forward_, 0, 1);
+  teleop_grid->addWidget(teleop_rotate_cw_, 0, 2);
+  teleop_grid->addWidget(teleop_strafe_left_, 1, 0);
+  teleop_grid->addWidget(teleop_stop_, 1, 1);
+  teleop_grid->addWidget(teleop_strafe_right_, 1, 2);
+  teleop_grid->addWidget(teleop_back_, 2, 1);
+  // Press-and-hold, not click-and-forget: `pressed()`/`released()` (mouse
+  // down/up) rather than `clicked()` (mouse up only). Only publishing
+  // while physically held means this stays silent on the shared cmd_vel
+  // topic the rest of the time, so it doesn't fight the Xbox joystick
+  // teleop (teleop_joy.launch.py) publishing to the same topic -- both
+  // can coexist as long as you're not holding a panel button and the
+  // stick at the same instant.
+  connect(teleop_forward_, &QPushButton::pressed, this, &LibbotControlPanel::onTeleopForward);
+  connect(teleop_back_, &QPushButton::pressed, this, &LibbotControlPanel::onTeleopBack);
+  connect(teleop_strafe_left_, &QPushButton::pressed, this, &LibbotControlPanel::onTeleopStrafeLeft);
+  connect(teleop_strafe_right_, &QPushButton::pressed, this, &LibbotControlPanel::onTeleopStrafeRight);
+  connect(teleop_rotate_cw_, &QPushButton::pressed, this, &LibbotControlPanel::onTeleopRotateCw);
+  connect(teleop_rotate_ccw_, &QPushButton::pressed, this, &LibbotControlPanel::onTeleopRotateCcw);
+  for (auto * btn : {teleop_forward_, teleop_back_, teleop_strafe_left_, teleop_strafe_right_,
+         teleop_rotate_cw_, teleop_rotate_ccw_}) {
+    connect(btn, &QPushButton::released, this, &LibbotControlPanel::onTeleopReleased);
+  }
+  connect(teleop_stop_, &QPushButton::clicked, this, &LibbotControlPanel::onTeleopStop);
+  teleop_v->addLayout(teleop_grid);
+  root->addWidget(teleop_box);
+  setTeleopButtonsEnabled(false);
+
   // ---------------- camera ----------------
   // RViz's own Image display crashes this GPU/driver combination
   // (separate GL render target -> "libGL error: failed to create
@@ -134,6 +188,9 @@ void LibbotControlPanel::onInitialize()
   switch_controller_client_ = node_->create_client<controller_manager_msgs::srv::SwitchController>(
     "/libbot/controller_manager/switch_controller");
 
+  nav_action_client_ = rclcpp_action::create_client<nav2_msgs::action::NavigateToPose>(
+    node_, "/navigate_to_pose");
+
   spin_timer_ = new QTimer(this);
   connect(spin_timer_, &QTimer::timeout, this, &LibbotControlPanel::onSpinTimer);
   spin_timer_->start(50);
@@ -149,6 +206,13 @@ void LibbotControlPanel::onSpinTimer()
 {
   if (node_) {
     rclcpp::spin_some(node_);
+  }
+  // Only republished while a direction button is physically held down
+  // (see the pressed()/released() wiring in the constructor) -- silent
+  // the rest of the time so it doesn't fight the Xbox joystick teleop
+  // publishing to the same topic.
+  if (teleop_active_ && teleop_key_held_) {
+    cmd_pub_->publish(teleop_cmd_);
   }
 }
 
@@ -199,6 +263,99 @@ void LibbotControlPanel::setEStop(bool engaged)
   switch_controller_client_->async_send_request(req);
   log(engaged ? "E-stop engaged: drive controller deactivated"
               : "E-stop released: drive controller reactivated");
+}
+
+void LibbotControlPanel::onTeleopToggled(bool checked)
+{
+  teleop_active_ = checked;
+  teleop_button_->setText(checked ? "Teleop Override ENGAGED (click to release)" : "Teleop Override");
+  setTeleopButtonsEnabled(checked);
+
+  if (checked) {
+    if (nav_action_client_ && nav_action_client_->action_server_is_ready()) {
+      nav_action_client_->async_cancel_all_goals();
+      log("Teleop override engaged: canceled any active Nav2 goal");
+    } else {
+      log("Teleop override engaged (Nav2 action server not reachable -- nothing to cancel)");
+    }
+  } else {
+    teleop_key_held_ = false;
+    teleop_cmd_ = geometry_msgs::msg::Twist();
+    cmd_pub_->publish(teleop_cmd_);
+    log("Teleop override released -- send a new Nav2 goal to resume autonomous driving");
+  }
+}
+
+void LibbotControlPanel::setTeleopButtonsEnabled(bool enabled)
+{
+  for (auto * btn : {teleop_forward_, teleop_back_, teleop_strafe_left_, teleop_strafe_right_,
+         teleop_rotate_cw_, teleop_rotate_ccw_, teleop_stop_}) {
+    if (btn) {
+      btn->setEnabled(enabled);
+    }
+  }
+}
+
+namespace
+{
+constexpr double kTeleopLinear = 0.3;
+constexpr double kTeleopAngular = 0.5;
+}  // namespace
+
+void LibbotControlPanel::onTeleopForward()
+{
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  teleop_cmd_.linear.x = kTeleopLinear;
+  teleop_key_held_ = true;
+}
+
+void LibbotControlPanel::onTeleopBack()
+{
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  teleop_cmd_.linear.x = -kTeleopLinear;
+  teleop_key_held_ = true;
+}
+
+void LibbotControlPanel::onTeleopStrafeLeft()
+{
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  teleop_cmd_.linear.y = kTeleopLinear;
+  teleop_key_held_ = true;
+}
+
+void LibbotControlPanel::onTeleopStrafeRight()
+{
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  teleop_cmd_.linear.y = -kTeleopLinear;
+  teleop_key_held_ = true;
+}
+
+void LibbotControlPanel::onTeleopRotateCw()
+{
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  teleop_cmd_.angular.z = -kTeleopAngular;
+  teleop_key_held_ = true;
+}
+
+void LibbotControlPanel::onTeleopRotateCcw()
+{
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  teleop_cmd_.angular.z = kTeleopAngular;
+  teleop_key_held_ = true;
+}
+
+void LibbotControlPanel::onTeleopReleased()
+{
+  teleop_key_held_ = false;
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  cmd_pub_->publish(teleop_cmd_);
+}
+
+void LibbotControlPanel::onTeleopStop()
+{
+  teleop_key_held_ = false;
+  teleop_cmd_ = geometry_msgs::msg::Twist();
+  cmd_pub_->publish(teleop_cmd_);
 }
 
 namespace

@@ -121,6 +121,30 @@ Visualization Manager:
         Durability Policy: Volatile
       Enabled: false
 
+    # FAST-LIO2's own registered 3D map + tracked trajectory (see
+    # localization_3d.launch.py) -- off by default since that's a
+    # separate optional launch, not part of simulation.launch.py.
+    - Class: rviz_default_plugins/PointCloud2
+      Name: FastLioCloud
+      Topic:
+        Value: /cloud_registered
+        Depth: 5
+        Durability Policy: Volatile
+      Size (m): 0.02
+      Style: Flat Squares
+      Color Transformer: AxisColor
+      Axis: Z
+      Enabled: false
+
+    - Class: rviz_default_plugins/Path
+      Name: FastLioPath
+      Topic:
+        Value: /path
+        Durability Policy: Volatile
+      Color: 255; 0; 0
+      Line Width: 0.03
+      Enabled: false
+
     - Class: nav2_rviz_plugins/ParticleCloud
       Name: AMCLParticles
       Topic:
@@ -146,18 +170,15 @@ Visualization Manager:
       Line Width: 0.03
       Enabled: true
 
-    # Breadcrumb trail of where the robot has actually driven (published
-    # by libbot_perception's trail_publisher_node), distinct from
-    # GlobalPlan/LocalPlan above which show where it's *going*. Good for
-    # demos: this is "what it did", those are "what it's about to do".
-    - Class: rviz_default_plugins/Path
+    # Breadcrumb trail of where the robot has actually driven in the last
+    # ~20s (published by libbot_perception's trail_publisher_node as a
+    # MarkerArray so each point can fade by age), distinct from
+    # GlobalPlan/LocalPlan above which show where it's *going* right now.
+    - Class: rviz_default_plugins/MarkerArray
       Name: Trail
       Topic:
         Value: /libbot/trail
         Durability Policy: Volatile
-      Color: 30; 144; 255
-      Line Width: 0.025
-      Pose Style: None
       Enabled: true
 
     # Nav2's actual planning footprint polygons -- shows the exact

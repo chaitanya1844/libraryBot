@@ -9,12 +9,14 @@
 #include <string>
 
 #include "rclcpp/rclcpp.hpp"
+#include "rclcpp_action/rclcpp_action.hpp"
 #include "rviz_common/panel.hpp"
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
+#include "nav2_msgs/action/navigate_to_pose.hpp"
 
 namespace libbot_rviz_plugins
 {
@@ -37,6 +39,15 @@ public:
 
 private Q_SLOTS:
   void onEStopToggled(bool checked);
+  void onTeleopToggled(bool checked);
+  void onTeleopForward();
+  void onTeleopBack();
+  void onTeleopStrafeLeft();
+  void onTeleopStrafeRight();
+  void onTeleopRotateCw();
+  void onTeleopRotateCcw();
+  void onTeleopStop();
+  void onTeleopReleased();
   void onStartMapping();
   void onStartLocalization();
   void onStartNavigation();
@@ -47,17 +58,22 @@ private Q_SLOTS:
 
 private:
   void setEStop(bool engaged);
+  void setTeleopButtonsEnabled(bool enabled);
   void log(const QString & text);
 
   rclcpp::Node::SharedPtr node_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
+  rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav_action_client_;
 
   nav_msgs::msg::Odometry::SharedPtr latest_odom_;
   std::mutex state_mutex_;
 
   bool estop_active_{false};
+  bool teleop_active_{false};
+  bool teleop_key_held_{false};
+  geometry_msgs::msg::Twist teleop_cmd_;
 
   QTimer * spin_timer_{nullptr};
   QTimer * ui_timer_{nullptr};
@@ -67,6 +83,14 @@ private:
 
   // manual drive
   QPushButton * estop_button_{nullptr};
+  QPushButton * teleop_button_{nullptr};
+  QPushButton * teleop_forward_{nullptr};
+  QPushButton * teleop_back_{nullptr};
+  QPushButton * teleop_strafe_left_{nullptr};
+  QPushButton * teleop_strafe_right_{nullptr};
+  QPushButton * teleop_rotate_cw_{nullptr};
+  QPushButton * teleop_rotate_ccw_{nullptr};
+  QPushButton * teleop_stop_{nullptr};
 
   QTextEdit * log_view_{nullptr};
 };
