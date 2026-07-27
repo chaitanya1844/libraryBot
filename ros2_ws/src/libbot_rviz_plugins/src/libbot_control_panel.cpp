@@ -538,7 +538,19 @@ void LibbotControlPanel::onStopAll()
   localization_active_ = false;
   navigation_active_ = false;
   updateModeButtons();
-  log("Everything stopped");
+
+  // Displays (point clouds, paths, markers) otherwise keep showing their
+  // last received message forever once the node publishing them is
+  // killed -- "ghosting" stale data from the stopped run. This panel is
+  // itself an RViz plugin living in the same process, so it can trigger
+  // the same reset the Displays panel's own "Reset" button does, instead
+  // of needing you to click that separately every time.
+  if (auto * ctx = getDisplayContext()) {
+    if (auto * root = ctx->getRootDisplayGroup()) {
+      root->reset();
+    }
+  }
+  log("Everything stopped, displays reset");
 }
 
 void LibbotControlPanel::updateModeButtons()
