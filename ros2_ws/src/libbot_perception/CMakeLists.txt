@@ -14,6 +14,7 @@ install(DIRECTORY config launch
 install(PROGRAMS
   libbot_perception/trail_publisher_node.py
   libbot_perception/lidar_3d_velodyne_adapter.py
+  libbot_perception/lidar_3d_self_filter.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

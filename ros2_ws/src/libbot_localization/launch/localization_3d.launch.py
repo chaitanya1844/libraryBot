@@ -11,6 +11,12 @@ FAST-LIO2 owns its own odometry (published as /Odometry, frame "camera_init"
 so this can run alongside the 2D stack without TF conflicts, but is a
 separate 3D-only localization/mapping demo, not merged into Nav2's costmaps.
 
+Assumes simulation.launch.py (or at least libbot_perception's
+lidar_processing.launch.py within it) is already running --
+lidar_3d_self_filter, which strips the robot's own stowed arm out of the
+lidar cloud, lives there since it's needed unconditionally (2D scan
+matching needs it too), not duplicated here.
+
 Requires the separate FAST_LIO (ROS2 branch) + livox_ros_driver2 overlay
 workspace to be built and sourced first (see repo README "3D localization"
 section for the from-source build steps -- these packages depend on
@@ -54,7 +60,10 @@ def generate_launch_description():
             executable='lidar_3d_velodyne_adapter.py',
             name='lidar_3d_velodyne_adapter',
             output='screen',
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'input_topic': '/libbot/lidar_3d/points_filtered',
+            }],
         ),
 
         IncludeLaunchDescription(

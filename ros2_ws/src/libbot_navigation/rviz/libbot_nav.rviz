@@ -77,7 +77,7 @@ Visualization Manager:
     - Class: rviz_default_plugins/PointCloud2
       Name: Lidar3D
       Topic:
-        Value: /libbot/lidar_3d/points
+        Value: /libbot/lidar_3d/points_filtered
         Depth: 5
         Durability Policy: Volatile
       Size (m): 0.035

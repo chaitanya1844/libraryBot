@@ -19,6 +19,17 @@ def generate_launch_description():
         DeclareLaunchArgument('config', default_value=os.path.join(
             pkg_share, 'config', 'pointcloud_to_laserscan.yaml')),
 
+        # Drops points that are actually the robot's own stowed arm
+        # (mounted close enough to the lidar that no stow pose puts it
+        # entirely outside the sensor's 360-degree ring) before anything
+        # downstream sees them -- see the node's own docstring.
+        Node(
+            package='libbot_perception',
+            executable='lidar_3d_self_filter.py',
+            name='lidar_3d_self_filter',
+            output='screen',
+        ),
+
         Node(
             package='pointcloud_to_laserscan',
             executable='pointcloud_to_laserscan_node',
@@ -26,7 +37,7 @@ def generate_launch_description():
             output='screen',
             parameters=[config],
             remappings=[
-                ('cloud_in', '/libbot/lidar_3d/points'),
+                ('cloud_in', '/libbot/lidar_3d/points_filtered'),
                 # global /scan, not /libbot/scan: slam_toolbox publishes its
                 # output map on a hardcoded absolute "/map" regardless of
                 # node namespace, so the whole nav stack (AMCL, slam_toolbox,
