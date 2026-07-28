@@ -13,7 +13,18 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml}"
 # Everything that could own map->odom, plus the full Nav2 autonomy stack
 # that sits on top of localization. Matches the same process-name
 # patterns used throughout this repo's own testing/cleanup.
-STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py"
+# Includes the `ros2 launch ... .launch.py` parent invocations
+# themselves (mapping.launch.py, localization_fastlio.launch.py,
+# autonomy.launch.py), not just the node executables they start:
+# pkill'ing only the children left the launch *parent* process itself
+# orphaned and still running every single time a mode was
+# started/restarted, since nothing ever told it its children had died --
+# measured 5 stacked zombie `ros2 launch ... localization_fastlio.launch.py`
+# processes accumulated over one session's worth of repeated Start
+# Localization clicks, each still fully alive and consuming resources,
+# a real and significant contributor to this project's recurring
+# "system load creeps back up" symptom.
+STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
 
 # FAST-LIO2 replaced AMCL as the localization source (see
 # libbot_localization/launch/localization_fastlio.launch.py) -- it lives
