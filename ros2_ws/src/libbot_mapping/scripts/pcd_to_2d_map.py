@@ -24,6 +24,7 @@ out real obstacles or let the floor itself show up as clutter.
 """
 import argparse
 import os
+import shutil
 
 import numpy as np
 import open3d as o3d
@@ -36,6 +37,14 @@ def main():
     parser.add_argument('output_name', help='Output name (no extension) -- writes <name>.pgm/.yaml')
     parser.add_argument('--output-dir', default=os.path.join(
         os.path.dirname(__file__), '..', 'maps'))
+    parser.add_argument('--pcd-output-dir', default=os.path.join(
+        os.path.dirname(__file__), '..', 'pcd_maps'),
+        help='Where to copy the source PCD, permanently renamed to match '
+             '<output_name>.pcd -- without this, every saved 2D map name '
+             'points back at the single, ever-overwritten pcd_maps/latest.pcd, '
+             'so picking an older map while a newer PCD has since been saved '
+             'silently pairs the wrong 3D data with it (localization then '
+             'confidently aligns against geometry from a different session).')
     parser.add_argument('--resolution', type=float, default=0.05, help='meters/pixel')
     parser.add_argument('--z-min', type=float, default=0.05,
                          help='meters above the PCD origin to start including points (skip the floor)')
@@ -101,6 +110,12 @@ def main():
         }, f)
 
     print(f'Wrote {pgm_path} ({width}x{height}) and {yaml_path}')
+
+    os.makedirs(args.pcd_output_dir, exist_ok=True)
+    named_pcd_path = os.path.join(args.pcd_output_dir, args.output_name + '.pcd')
+    if os.path.abspath(named_pcd_path) != os.path.abspath(args.pcd_path):
+        shutil.copyfile(args.pcd_path, named_pcd_path)
+        print(f'Copied source PCD to {named_pcd_path} (permanently paired with this map name)')
 
 
 if __name__ == '__main__':

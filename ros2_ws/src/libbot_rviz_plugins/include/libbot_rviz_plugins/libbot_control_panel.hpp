@@ -79,6 +79,7 @@ private:
   void log(const QString & text);
   QString mapsDir() const;
   QString pcdPath() const;
+  QString pcdMapsDir() const;
   QString selectedMapYamlPath() const;
 
   rclcpp::Node::SharedPtr node_;

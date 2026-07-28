@@ -666,7 +666,7 @@ void LibbotControlPanel::onSaveMap()
           });
         convert_process_->start(
           "ros2", {"run", "libbot_mapping", "pcd_to_2d_map.py", pcdPath(), name,
-            "--output-dir", mapsDir()});
+            "--output-dir", mapsDir(), "--pcd-output-dir", pcdMapsDir()});
       });
     });
 }
@@ -684,6 +684,7 @@ void LibbotControlPanel::onDeleteMap()
   }
   QFile::remove(mapsDir() + "/" + name + ".yaml");
   QFile::remove(mapsDir() + "/" + name + ".pgm");
+  QFile::remove(pcdMapsDir() + "/" + name + ".pcd");
   log("Deleted '" + name + "'");
   onRefreshMaps();
 }
@@ -713,6 +714,11 @@ QString LibbotControlPanel::mapsDir() const
 QString LibbotControlPanel::pcdPath() const
 {
   return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd";
+}
+
+QString LibbotControlPanel::pcdMapsDir() const
+{
+  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps";
 }
 
 QString LibbotControlPanel::selectedMapYamlPath() const

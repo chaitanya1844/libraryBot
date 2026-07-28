@@ -84,14 +84,25 @@ case "$MODE" in
   localization)
     stop_stack
     source_fastlio_ws
-    # Same PCD /map_save always writes (pcd_maps/latest.pcd, overwritten
-    # each mapping run) -- enables continuous ICP correction against it
-    # instead of only the one-shot auto-align at startup. FAST-LIO2 itself
-    # has no "localize against a prior map" mode: it always runs live SLAM
-    # from scratch, so its own point cloud (FastLioCloud/yellow) will keep
-    # growing regardless -- this is what keeps that fresh session aligned
-    # with the map you actually saved.
-    PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+    # Named PCD matching MAP_PATH's own name (pcd_to_2d_map.py copies it
+    # there under that name at save time) -- NOT always pcd_maps/latest.pcd
+    # regardless of which map was actually selected, which an earlier
+    # version of this did: latest.pcd is a single, ever-overwritten scratch
+    # slot (whatever /map_save wrote most recently), so picking an older
+    # saved map while a newer one has since been mapped silently paired
+    # the wrong 3D data with it -- localization would confidently ICP-align
+    # against geometry from an entirely different session, explaining both
+    # "old PCD ghosting" and Nav2 goals failing against a mismatched map.
+    # Falls back to latest.pcd only if no matching named PCD exists yet
+    # (maps saved before this fix).
+    MAP_BASENAME="$(basename "${MAP_PATH}" .yaml)"
+    NAMED_PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/${MAP_BASENAME}.pcd"
+    if [ -f "$NAMED_PCD_PATH" ]; then
+      PCD_PATH="$NAMED_PCD_PATH"
+    else
+      PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+      echo "switch_mode.sh: no ${MAP_BASENAME}.pcd, falling back to latest.pcd (may not match ${MAP_BASENAME}.yaml)" >&2
+    fi
     ros2 launch libbot_localization localization_fastlio.launch.py \
       "map:=${MAP_PATH}" "pcd_map_path:=${PCD_PATH}" &
     ;;
