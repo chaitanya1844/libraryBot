@@ -13,7 +13,6 @@ install(DIRECTORY config launch
 
 install(PROGRAMS
   libbot_manipulation/task_manager_node.py
-  libbot_manipulation/book_sorter_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
