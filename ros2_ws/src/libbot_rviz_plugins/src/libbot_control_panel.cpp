@@ -503,10 +503,19 @@ void LibbotControlPanel::onStartLocalization()
 
 void LibbotControlPanel::onStartNavigation()
 {
-  QProcess::startDetached("bash", {"-c", switchModeScript() + " navigation"});
-  navigation_active_ = true;
-  updateModeButtons();
-  log("Navigation started");
+  // Stow first, *then* start driving -- an arm left extended (e.g. from
+  // the sliders above) clipping a wall mid-drive is exactly how the
+  // robot toppled here. arm_stow_node.py only ever stows once, a few
+  // seconds after simulation.launch.py starts; nothing re-stows it
+  // before a later Start Navigation if the arm moved since then.
+  onResetArm();
+  QTimer::singleShot(1600, this, [this]() {
+    QProcess::startDetached("bash", {"-c", switchModeScript() + " navigation"});
+    navigation_active_ = true;
+    updateModeButtons();
+    log("Navigation started");
+  });
+  log("Stowing arm before navigation...");
 }
 
 void LibbotControlPanel::onStopMapping()
