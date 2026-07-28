@@ -146,6 +146,17 @@ class FastLioMapOdomBridge(Node):
         if self._use_external_localization:
             self.create_subscription(
                 Odometry, '/map_to_odom', self._on_external_map_to_odom, 10)
+            # Doesn't use the pose itself (global_localization.py's own
+            # subscription handles that) -- only listens for the *event*,
+            # to reset the smoothing state below. Without this, re-giving
+            # "2D Pose Estimate" on an already-running, already-converged
+            # (possibly to the *wrong* place) session had no effect: the
+            # resulting jump in /map_to_odom is exactly what a deliberate
+            # re-seed looks like, several meters in one step, which the
+            # outlier rejection below is specifically designed to ignore
+            # as noise -- silently discarding the fix along with it.
+            self.create_subscription(
+                PoseWithCovarianceStamped, '/initialpose', self._on_reseed, 10)
             self.get_logger().info(
                 'fastlio_map_odom_bridge ready -- waiting for /map_to_odom from '
                 'fast_lio_localization (needs RViz\'s "2D Pose Estimate" to seed it).')
@@ -156,6 +167,14 @@ class FastLioMapOdomBridge(Node):
                 'fastlio_map_odom_bridge ready -- publishing map->%s from /Odometry, '
                 'auto-aligned to the current pose (mapping mode, no prior map).'
                 % self._odom_frame)
+
+    def _on_reseed(self, msg: PoseWithCovarianceStamped):
+        self._smoothed_xy = None
+        self._smoothed_yaw = None
+        self.get_logger().info(
+            'New 2D Pose Estimate -- resetting map->odom smoothing so the '
+            'resulting correction is applied immediately instead of being '
+            'rejected as an outlier.')
 
     def _on_external_map_to_odom(self, msg: Odometry):
         # fast_lio_localization's "odom" is FAST-LIO2's own /Odometry pose
