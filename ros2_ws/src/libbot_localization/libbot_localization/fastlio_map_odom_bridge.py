@@ -236,6 +236,20 @@ class FastLioMapOdomBridge(Node):
                 % (self._base_frame,
                    ' -- placeholder until ICP corrects it' if self._use_external_localization else ''))
 
+        # Stamped with *now*, not msg.header.stamp (FAST-LIO2's own
+        # /Odometry processing timestamp, consistently ~1-1.5s behind sim
+        # time here) -- odom_to_base above was already looked up at the
+        # latest available time (Time(), not msg.header.stamp), so
+        # broadcasting the correction as "true as of whenever /Odometry
+        # was captured" was internally inconsistent with that, and
+        # measured leaving the map->odom link's TF history thin/gapped
+        # enough that other nodes' costmap message filters (needing
+        # map->...->lidar_3d_link at *their* message's, more current,
+        # timestamp) would find no bracketing samples at all and drop
+        # every single scan -- "failed to create plan", robot accepting
+        # goals but never actually moving.
+        now = self.get_clock().now().to_msg()
+
         # Also broadcast map->camera_init directly (not just folded into
         # map->odom below) so RViz can place FAST-LIO2's own outputs that
         # are stamped in its "camera_init" frame -- /cloud_registered,
@@ -244,7 +258,7 @@ class FastLioMapOdomBridge(Node):
         # unrelated to the 2D map, which is exactly "3D map not
         # overlaying the 2D map" as seen in RViz.
         camera_init_out = TransformStamped()
-        camera_init_out.header.stamp = msg.header.stamp
+        camera_init_out.header.stamp = now
         camera_init_out.header.frame_id = 'map'
         camera_init_out.child_frame_id = 'camera_init'
         matrix_to_transform(self._map_to_camera_init, camera_init_out)
@@ -255,7 +269,7 @@ class FastLioMapOdomBridge(Node):
         map_to_odom = map_to_base @ np.linalg.inv(odom_to_base_m)
 
         out = TransformStamped()
-        out.header.stamp = msg.header.stamp
+        out.header.stamp = now
         out.header.frame_id = 'map'
         out.child_frame_id = self._odom_frame
         matrix_to_transform(map_to_odom, out)
