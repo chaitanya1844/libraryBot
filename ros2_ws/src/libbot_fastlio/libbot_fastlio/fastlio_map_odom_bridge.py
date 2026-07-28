@@ -100,10 +100,26 @@ class FastLioMapOdomBridge(Node):
         # something to treat as zero.
         self.declare_parameter('body_frame', 'imu_link')
         self.declare_parameter('use_external_localization', False)
+        # global_localization.py re-registers via ICP every cycle with
+        # real scan-to-scan noise and no smoothing of its own -- applying
+        # each new x/y/yaw raw made map->odom (and everything drawn under
+        # "map": RobotModel via TF, item markers, etc.) visibly jitter.
+        # Exponential smoothing plus outlier rejection (a single wildly-
+        # off registration, e.g. from a momentarily bad scan, snapping
+        # the whole map frame to a wrong pose instead of being ignored)
+        # fixes both without adding meaningful lag to real corrections.
+        self.declare_parameter('icp_smoothing_alpha', 0.2)
+        self.declare_parameter('icp_outlier_reject_m', 0.5)
+        self.declare_parameter('icp_outlier_reject_rad', 0.35)
         self._odom_frame = self.get_parameter('odom_frame').value
         self._base_frame = self.get_parameter('base_frame').value
         self._body_frame = self.get_parameter('body_frame').value
         self._use_external_localization = self.get_parameter('use_external_localization').value
+        self._icp_alpha = self.get_parameter('icp_smoothing_alpha').value
+        self._icp_reject_m = self.get_parameter('icp_outlier_reject_m').value
+        self._icp_reject_rad = self.get_parameter('icp_outlier_reject_rad').value
+        self._smoothed_xy = None
+        self._smoothed_yaw = None
         # base_frame -> body_frame is fixed (both come from
         # robot_state_publisher's static URDF joints), so this is looked
         # up once and cached rather than every callback.
@@ -164,11 +180,27 @@ class FastLioMapOdomBridge(Node):
 
         received = pose_to_matrix(msg.pose.pose.position, msg.pose.pose.orientation)
         yaw = Rotation.from_matrix(received[:3, :3]).as_euler('zyx')[0]
+        xy = received[:2, 3]
         reference = odom_to_base_m @ self._base_to_body @ np.linalg.inv(self._latest_camera_init_to_body)
 
+        if self._smoothed_xy is not None:
+            dxy = xy - self._smoothed_xy
+            dyaw = (yaw - self._smoothed_yaw + np.pi) % (2 * np.pi) - np.pi
+            if np.hypot(*dxy) > self._icp_reject_m or abs(dyaw) > self._icp_reject_rad:
+                # Single wildly-off ICP registration (bad scan, transient
+                # mismatch) -- ignore it rather than snapping the whole
+                # map frame to a likely-wrong pose; the next, hopefully
+                # saner, registration will still get through normally.
+                return
+            self._smoothed_xy = self._smoothed_xy + self._icp_alpha * dxy
+            self._smoothed_yaw = self._smoothed_yaw + self._icp_alpha * dyaw
+        else:
+            self._smoothed_xy = xy
+            self._smoothed_yaw = yaw
+
         constrained = np.eye(4)
-        constrained[:3, :3] = Rotation.from_euler('z', yaw).as_matrix()
-        constrained[:2, 3] = received[:2, 3]
+        constrained[:3, :3] = Rotation.from_euler('z', self._smoothed_yaw).as_matrix()
+        constrained[:2, 3] = self._smoothed_xy
         constrained[2, 3] = reference[2, 3]
 
         self._map_to_camera_init = constrained

@@ -133,6 +133,14 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   connect(arm_reset_btn, &QPushButton::clicked, this, &LibbotControlPanel::onResetArm);
   arm_grid->addWidget(arm_move_btn, 4, 0, 1, 3);
   arm_grid->addWidget(arm_reset_btn, 5, 0, 1, 3);
+  // Runs book_sorter_node.py (libbot_manipulation): collects the
+  // tracked books (same names as item_pose_publisher's item_names) into
+  // the front tray/basket one at a time and delivers each to a randomly
+  // chosen center shelf. Needs Navigation already running -- it's a
+  // NavigateToPose client, not a replacement for it.
+  auto * sort_books_btn = new QPushButton("Sort Books");
+  connect(sort_books_btn, &QPushButton::clicked, this, &LibbotControlPanel::onSortBooks);
+  arm_grid->addWidget(sort_books_btn, 6, 0, 1, 3);
   root->addWidget(arm_box);
 
   // ---------------- mode: Map -> Localize -> Navigate ----------------
@@ -517,6 +525,19 @@ void LibbotControlPanel::onResetArm()
     arm_sliders_[i]->setValue(static_cast<int>(kDefaultPose[i] * 1000));
   }
   onMoveArm();
+}
+
+void LibbotControlPanel::onSortBooks()
+{
+  if (!navigation_active_) {
+    log("Sort Books: start Navigation first -- book_sorter_node.py needs it.");
+    return;
+  }
+  QProcess::startDetached(
+    "bash", {"-c", "source /home/sychic/libraryBot/ros2_ws/install/setup.bash && "
+      "ros2 run libbot_manipulation book_sorter_node.py"});
+  log("Sort Books started -- collecting tracked books into the tray and "
+      "delivering each to a random center shelf.");
 }
 
 void LibbotControlPanel::onStartMapping()

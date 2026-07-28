@@ -13,10 +13,38 @@
 
   <xacro:libbot_imu parent="base_link" xyz="0 0 ${chassis_z/2 + 0.01}"/>
 
+  <!-- Riser between the mast puck top and the lidar: purely cosmetic
+       (thin standoff cylinder, no functional role), added because the
+       lidar's mount height is deliberately well above the puck (next
+       block down), which otherwise reads as the lidar floating
+       disconnected above the robot rather than mounted on it. -->
+  <link name="lidar_riser_link">
+    <visual>
+      <geometry><cylinder radius="0.05" length="0.12"/></geometry>
+      <material name="libbot_wheel_black"/>
+    </visual>
+    <inertial>
+      <mass value="0.05"/>
+      <inertia ixx="1e-5" ixy="0" ixz="0" iyy="1e-5" iyz="0" izz="1e-5"/>
+    </inertial>
+  </link>
+  <joint name="lidar_riser_joint" type="fixed">
+    <parent link="sensor_mast_link"/>
+    <child link="lidar_riser_link"/>
+    <!-- Spans mast top (z=mast_height/2=0.06) up to the lidar's bottom
+         face (lidar origin 0.21 minus its own half-height 0.03 = 0.18),
+         so length=0.12 centered at z=0.12 (=mast_height/2+0.06) touches
+         both with no gap, under the lidar's own forward-shifted x value. -->
+    <origin xyz="0.04 0 ${mast_height/2 + 0.06}" rpy="0 0 0"/>
+  </joint>
+
   <!-- Raised well above the sensor-mast puck top (was only 0.03m above
        it, so the lidar's own downward FOV rays clipped the mast/chassis
-       fascia at short range, especially once the robot started moving). -->
-  <xacro:libbot_lidar_3d parent="sensor_mast_link" xyz="0 0 ${mast_height/2 + 0.15}" hz="5"/>
+       fascia at short range, especially once the robot started moving);
+       kept unchanged, only x shifted slightly forward per request, with
+       the riser above now visually connecting it to the puck instead of
+       leaving a bare gap. -->
+  <xacro:libbot_lidar_3d parent="sensor_mast_link" xyz="0.04 0 ${mast_height/2 + 0.15}" hz="5"/>
 
   <!-- RealSense D435i mounted forward-facing on the chassis's upper
        front face at roughly mid-shelf height, angled down slightly to

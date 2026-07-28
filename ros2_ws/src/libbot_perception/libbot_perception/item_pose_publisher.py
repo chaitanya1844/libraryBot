@@ -55,11 +55,20 @@ class ItemPosePublisher(Node):
         self.declare_parameter('item_names', [
             'BookE_01_006', 'BookE_01_007', 'BookE_01_030', 'BookE_01_017',
         ])
+        # The big center shelves, tracked the same way but with a bigger
+        # cube marker instead of a small sphere so they read as
+        # landmarks rather than pickable items.
+        self.declare_parameter('shelf_names', [
+            'BookshelfA_01_001', 'BookshelfA_01_002',
+            'BookshelfA_01_003', 'BookshelfA_01_004',
+        ])
         self.declare_parameter('model_states_topic', '/libbot/model_states')
         self.declare_parameter('marker_topic', '/item_markers')
         self.declare_parameter('frame_id', 'world')
         self.declare_parameter('marker_scale', 0.12)
         self.declare_parameter('color_rgb', [1.0, 0.55, 0.0])
+        self.declare_parameter('shelf_marker_scale', [1.0, 0.4, 1.8])
+        self.declare_parameter('shelf_color_rgb', [0.15, 0.45, 0.95])
         # Must match simulation.launch.py's x/y/yaw spawn args -- odom's
         # origin is defined as the robot's spawn pose (this project's EKF
         # convention), so this is the one fixed fact needed to place
@@ -72,6 +81,8 @@ class ItemPosePublisher(Node):
         self._frame_id = self.get_parameter('frame_id').value
         self._scale = self.get_parameter('marker_scale').value
         self._color_rgb = self.get_parameter('color_rgb').value
+        self._shelf_scale = self.get_parameter('shelf_marker_scale').value
+        self._shelf_color_rgb = self.get_parameter('shelf_color_rgb').value
 
         self._tf_broadcaster = TransformBroadcaster(self)
         self._static_broadcaster = StaticTransformBroadcaster(self)
@@ -85,10 +96,11 @@ class ItemPosePublisher(Node):
 
         self._missing_warned = set()
         self.get_logger().info(
-            f"item_pose_publisher ready -- tracking "
-            f"{self.get_parameter('item_names').value} from "
+            f"item_pose_publisher ready -- tracking items "
+            f"{self.get_parameter('item_names').value} and shelves "
+            f"{self.get_parameter('shelf_names').value} from "
             f"{self.get_parameter('model_states_topic').value}, "
-            f"publishing TF '{self._frame_id}' -> <item_name> and "
+            f"publishing TF '{self._frame_id}' -> <name> and "
             f"MarkerArray on {self.get_parameter('marker_topic').value}.")
 
     def _publish_world_frame(self):
@@ -117,66 +129,77 @@ class ItemPosePublisher(Node):
 
     def _on_model_states(self, msg: ModelStates):
         item_names = self.get_parameter('item_names').value
+        shelf_names = self.get_parameter('shelf_names').value
         name_to_index = {name: i for i, name in enumerate(msg.name)}
         stamp = self.get_clock().now().to_msg()
 
         markers = MarkerArray()
-        for marker_id, item_name in enumerate(item_names):
-            idx = name_to_index.get(item_name)
-            if idx is None:
-                if item_name not in self._missing_warned:
-                    self.get_logger().warn(
-                        f"'{item_name}' not found in model_states -- "
-                        f"check the name against library.world.")
-                    self._missing_warned.add(item_name)
-                continue
-            self._missing_warned.discard(item_name)
-            pose = msg.pose[idx]
-
-            t = TransformStamped()
-            t.header.stamp = stamp
-            t.header.frame_id = self._frame_id
-            t.child_frame_id = item_name
-            t.transform.translation.x = pose.position.x
-            t.transform.translation.y = pose.position.y
-            t.transform.translation.z = pose.position.z
-            t.transform.rotation = pose.orientation
-            self._tf_broadcaster.sendTransform(t)
-
-            markers.markers.append(self._make_sphere(item_name, marker_id, pose, stamp))
-            markers.markers.append(self._make_label(item_name, marker_id, pose, stamp))
+        # id ranges kept disjoint (items: 0..999, shelves: 1000..1999) so
+        # the two categories never collide even as more names are added.
+        for marker_id, name in enumerate(item_names):
+            markers.markers.extend(self._track_one(
+                name, marker_id, name_to_index, msg, stamp,
+                'item_markers', 'item_labels', Marker.SPHERE,
+                (self._scale,) * 3, self._color_rgb, self._scale))
+        for marker_id, name in enumerate(shelf_names):
+            markers.markers.extend(self._track_one(
+                name, 1000 + marker_id, name_to_index, msg, stamp,
+                'shelf_markers', 'shelf_labels', Marker.CUBE,
+                tuple(self._shelf_scale), self._shelf_color_rgb,
+                max(self._shelf_scale)))
 
         if markers.markers:
             self._marker_pub.publish(markers)
 
-    def _make_sphere(self, item_name, marker_id, pose, stamp):
-        m = Marker()
-        m.header.frame_id = self._frame_id
-        m.header.stamp = stamp
-        m.ns = 'item_markers'
-        m.id = marker_id * 2
-        m.type = Marker.SPHERE
-        m.action = Marker.ADD
-        m.pose = pose
-        m.scale.x = m.scale.y = m.scale.z = self._scale
-        r, g, b = self._color_rgb
-        m.color = ColorRGBA(r=r, g=g, b=b, a=0.9)
-        return m
+    def _track_one(self, name, marker_id, name_to_index, msg, stamp,
+                    marker_ns, label_ns, marker_type, scale_xyz, color_rgb, label_offset):
+        idx = name_to_index.get(name)
+        if idx is None:
+            if name not in self._missing_warned:
+                self.get_logger().warn(
+                    f"'{name}' not found in model_states -- "
+                    f"check the name against library.world.")
+                self._missing_warned.add(name)
+            return []
+        self._missing_warned.discard(name)
+        pose = msg.pose[idx]
 
-    def _make_label(self, item_name, marker_id, pose, stamp):
-        m = Marker()
-        m.header.frame_id = self._frame_id
-        m.header.stamp = stamp
-        m.ns = 'item_labels'
-        m.id = marker_id * 2 + 1
-        m.type = Marker.TEXT_VIEW_FACING
-        m.action = Marker.ADD
-        m.pose = pose
-        m.pose.position.z += self._scale * 1.5
-        m.scale.z = self._scale * 1.2
-        m.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=0.9)
-        m.text = item_name
-        return m
+        t = TransformStamped()
+        t.header.stamp = stamp
+        t.header.frame_id = self._frame_id
+        t.child_frame_id = name
+        t.transform.translation.x = pose.position.x
+        t.transform.translation.y = pose.position.y
+        t.transform.translation.z = pose.position.z
+        t.transform.rotation = pose.orientation
+        self._tf_broadcaster.sendTransform(t)
+
+        marker = Marker()
+        marker.header.frame_id = self._frame_id
+        marker.header.stamp = stamp
+        marker.ns = marker_ns
+        marker.id = marker_id * 2
+        marker.type = marker_type
+        marker.action = Marker.ADD
+        marker.pose = pose
+        marker.scale.x, marker.scale.y, marker.scale.z = scale_xyz
+        r, g, b = color_rgb
+        marker.color = ColorRGBA(r=r, g=g, b=b, a=0.85)
+
+        label = Marker()
+        label.header.frame_id = self._frame_id
+        label.header.stamp = stamp
+        label.ns = label_ns
+        label.id = marker_id * 2 + 1
+        label.type = Marker.TEXT_VIEW_FACING
+        label.action = Marker.ADD
+        label.pose = pose
+        label.pose.position.z += label_offset * 1.5
+        label.scale.z = self._scale * 1.2
+        label.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=0.9)
+        label.text = name
+
+        return [marker, label]
 
 
 def main():

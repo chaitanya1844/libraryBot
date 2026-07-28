@@ -71,6 +71,7 @@ private Q_SLOTS:
   void onSpinTimer();
   void onUiTimer();
   void onSendGoal();
+  void onSortBooks();
 
 private:
   void setEStop(bool engaged);
