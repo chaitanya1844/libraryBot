@@ -1,9 +1,9 @@
 <?xml version="1.0"?>
 <?xml-stylesheet type="text/xsl" href="http://download.ros.org/schema/package_format3.xsd"?>
 <package format="3">
-  <name>libbot_localization</name>
+  <name>libbot_fastlio</name>
   <version>0.1.0</version>
-  <description>EKF (robot_localization) and FAST-LIO2 (3D lidar-inertial) localization configuration for libraryBot</description>
+  <description>FAST-LIO2 mapping and localization for libraryBot: EKF, 3D SLAM, PCD/2D map save+convert, and ICP relocalization against a saved map, all in one package</description>
   <maintainer email="chaitanyabht@gmail.com">chaitanyabht</maintainer>
   <license>Apache-2.0</license>
 
@@ -12,22 +12,30 @@
   <exec_depend>robot_localization</exec_depend>
   <exec_depend>nav2_map_server</exec_depend>
   <exec_depend>nav2_lifecycle_manager</exec_depend>
-  <exec_depend>libbot_mapping</exec_depend>
   <!-- 3D localization (localization_3d.launch.py) against the 3D lidar +
        IMU via FAST-LIO2, not resolvable via rosdep: built from source as
        a separate overlay workspace, see that launch file's docstring. -->
   <exec_depend>fast_lio</exec_depend>
   <exec_depend>libbot_perception</exec_depend>
-  <!-- localization_fastlio.launch.py's actual relocalization-against-a-
-       saved-map engine (fastlio_map_odom_bridge.py just relays its
-       /map_to_odom output, see that package's own docstring). -->
-  <exec_depend>fast_lio_localization</exec_depend>
+  <exec_depend>pcl_ros</exec_depend>
 
-  <!-- fastlio_map_odom_bridge.py (localization_fastlio.launch.py) -->
+  <!-- scripts/pcd_to_2d_map.py: Open3D has no rosdep key, `pip install
+       open3d`; PyYAML is python3-yaml. -->
+  <exec_depend>python3-yaml</exec_depend>
+  <!-- scripts/mapping_preview_node.py, fastlio_map_odom_bridge.py,
+       global_localization.py, publish_initial_pose.py -->
   <exec_depend>rclpy</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
-  <exec_depend>python3-scipy</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
+  <exec_depend>python3-scipy</exec_depend>
+  <exec_depend>sensor_msgs</exec_depend>
+  <exec_depend>sensor_msgs_py</exec_depend>
+  <exec_depend>nav_msgs</exec_depend>
+  <exec_depend>geometry_msgs</exec_depend>
+  <exec_depend>std_msgs</exec_depend>
+  <!-- global_localization.py/publish_initial_pose.py (vendored from
+       HViktorTsoi/FAST_LIO_LOCALIZATION, see README.fast_lio_localization.md):
+       no rosdep keys, `pip install open3d tf_transformations ros2_numpy` -->
 
   <test_depend>ament_lint_auto</test_depend>
   <test_depend>ament_lint_common</test_depend>

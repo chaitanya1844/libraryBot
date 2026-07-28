@@ -1,13 +1,13 @@
 """Core bringup: Gazebo + robot + control + lidar processing + EKF +
-Xbox teleop + control panel + RViz. Does NOT start SLAM or AMCL by
-default -- drive the
-robot around with the RViz-embedded control panel's "Start Mapping" /
-"Start Localization" / "Start Navigation" buttons to move through that
-workflow interactively (see README "Map, localize, navigate workflow").
+Xbox teleop + RViz (with the embedded libraryBot Controls panel). Does
+NOT start SLAM or AMCL by default -- drive the robot around with the
+RViz-embedded control panel's "Start Mapping" / "Start Localization" /
+"Start Navigation" buttons to move through that workflow interactively
+(see README "Map, localize, navigate workflow").
 
     ros2 launch libbot_bringup simulation.launch.py
     ros2 launch libbot_bringup simulation.launch.py headless:=true
-    ros2 launch libbot_bringup simulation.launch.py control_panel:=false rviz:=false
+    ros2 launch libbot_bringup simulation.launch.py rviz:=false
 
 Launch args `mode` (mapping/navigation/none, default none) and `map` are
 still available for scripting a specific stage directly instead of using
@@ -61,7 +61,6 @@ def generate_launch_description():
     x = LaunchConfiguration('x')
     y = LaunchConfiguration('y')
     yaw = LaunchConfiguration('yaw')
-    control_panel = LaunchConfiguration('control_panel')
     rviz = LaunchConfiguration('rviz')
     teleop_joy = LaunchConfiguration('teleop_joy')
 
@@ -80,17 +79,11 @@ def generate_launch_description():
                                description="'mapping', 'navigation', or 'none' "
                                             "(use the panel's Mode buttons instead)"),
         DeclareLaunchArgument('map', default_value=os.path.join(
-            get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
+            get_package_share_directory('libbot_fastlio'), 'maps', 'library.yaml')),
         DeclareLaunchArgument('x', default_value='1.0'),
         DeclareLaunchArgument('y', default_value='3.3'),
         # Flipped 180deg from the original 1.5708 spawn yaw per user request.
         DeclareLaunchArgument('yaw', default_value='-1.5708'),
-        # The RViz-embedded "libraryBot Controls" panel (libbot_rviz_plugins)
-        # is the primary control surface and is always part of the rviz
-        # config below. This standalone PyQt5 window is a legacy/headless
-        # fallback -- off by default so you don't get two copies of the
-        # same controls in two separate windows.
-        DeclareLaunchArgument('control_panel', default_value='false'),
         DeclareLaunchArgument('rviz', default_value='true'),
         DeclareLaunchArgument('teleop_joy', default_value='true',
                                description='Start Xbox controller teleop automatically. '
@@ -126,9 +119,9 @@ def generate_launch_description():
         )]),
 
         # 5. Localization: EKF always; SLAM (mapping) or AMCL (navigation) exclusively
-        _include('libbot_mapping', 'mapping.launch.py', {'use_sim_time': use_sim_time},
+        _include('libbot_fastlio', 'mapping.launch.py', {'use_sim_time': use_sim_time},
                  condition=IfCondition(is_mapping), delay=11.0),
-        _include('libbot_localization', 'localization.launch.py', {
+        _include('libbot_fastlio', 'localization.launch.py', {
             'use_sim_time': use_sim_time,
             'use_amcl': is_navigation,
             'map': map_yaml,
@@ -138,9 +131,7 @@ def generate_launch_description():
         _include('libbot_control', 'teleop_joy.launch.py', {},
                  condition=IfCondition(teleop_joy), delay=6.0),
 
-        # 7. Control panel + RViz
-        _include('libbot_control_panel', 'control_panel.launch.py', {},
-                 condition=IfCondition(control_panel), delay=6.0),
+        # 7. RViz (libraryBot Controls panel is embedded in the config)
         Node(
             package='rviz2',
             executable='rviz2',

@@ -1,13 +1,13 @@
 """Nav2 planning/control stack (controller, planner, behaviors, bt_navigator,
 waypoint_follower) -- NOT AMCL/map_server, which live in
-libbot_localization/launch/localization.launch.py so localization can be
+libbot_fastlio/launch/localization.launch.py so localization can be
 restarted independently of planning.
 
     ros2 launch libbot_navigation navigation.launch.py
 
 Prerequisites already running: libbot_gazebo spawn_robot, libbot_control
 control, libbot_perception lidar_processing, and
-libbot_localization localization.launch.py use_amcl:=true map:=<path>.
+libbot_fastlio localization.launch.py use_amcl:=true map:=<path>.
 """
 import os
 

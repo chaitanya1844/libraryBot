@@ -1,7 +1,7 @@
-"""3D mapping via FAST-LIO2 (see libbot_localization/launch/localization_3d.launch.py
+"""3D mapping via FAST-LIO2 (see libbot_fastlio/launch/localization_3d.launch.py
 for the actual nodes -- this just includes it under the mapping package's
 own launch name, since the control panel's "Start Mapping" button and
-switch_mode.sh both look for `libbot_mapping mapping.launch.py`).
+switch_mode.sh both look for `libbot_fastlio mapping.launch.py`).
 
 slam_toolbox (2D lidar SLAM) was the original mapping source before
 FAST-LIO2 replaced AMCL as the localization source too -- running both
@@ -11,7 +11,7 @@ longer starts slam_toolbox_online_async.
 
 Workflow:
 
-    ros2 launch libbot_mapping mapping.launch.py
+    ros2 launch libbot_fastlio mapping.launch.py
 
 Drive the robot around (teleop or control panel) to build up the 3D
 map, then save it -- FAST-LIO2's own `/map_save` service, NOT Ctrl-C:
@@ -26,14 +26,14 @@ unhandled PCL exception that crashes the node if it's empty.)
     ros2 service call /map_save std_srvs/srv/Trigger
 
 That writes the PCD to `map_file_path` (fast_lio_libbot.yaml, currently
-libbot_mapping/pcd_maps/latest.pcd). Then convert it to the 2D
+libbot_fastlio/pcd_maps/latest.pcd). Then convert it to the 2D
 occupancy grid Nav2's costmaps need:
 
-    ros2 run libbot_mapping pcd_to_2d_map.py /path/to/latest.pcd my_map_name
+    ros2 run libbot_fastlio pcd_to_2d_map.py /path/to/latest.pcd my_map_name
 
 Then localize against both with:
 
-    ros2 launch libbot_localization localization_fastlio.launch.py \\
+    ros2 launch libbot_fastlio localization_fastlio.launch.py \\
         map:=/path/to/my_map_name.yaml pcd_map_path:=/path/to/latest.pcd
 
 RViz's Fixed Frame is "map", but nothing publishes it at all during
@@ -67,7 +67,7 @@ localization_fastlio.launch.py's fastlio_mapping instance publishes
 /Laser_map too (its own fresh live SLAM session, no "localize-only" mode
 exists), and RViz's FastLioCloud display needs to tell that apart from
 this mapping run's -- see libbot_nav.rviz (green while mapping, yellow
-while localizing). fast_lio_localization's global_localization.py
+while localizing). libbot_fastlio's global_localization.py
 doesn't consume /Laser_map at all (only /cloud_registered, /Odometry),
 so remapping it doesn't affect anything functional, only which RViz
 display picks it up.
@@ -90,7 +90,7 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
 
         Node(
-            package='libbot_localization',
+            package='libbot_fastlio',
             executable='fastlio_map_odom_bridge.py',
             name='fastlio_map_odom_bridge',
             output='screen',
@@ -98,7 +98,7 @@ def generate_launch_description():
         ),
 
         Node(
-            package='libbot_mapping',
+            package='libbot_fastlio',
             executable='mapping_preview_node.py',
             name='mapping_preview_node',
             output='screen',
@@ -108,7 +108,7 @@ def generate_launch_description():
         SetRemap(src='/Laser_map', dst='/Laser_map_mapping'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(
-                get_package_share_directory('libbot_localization'),
+                get_package_share_directory('libbot_fastlio'),
                 'launch', 'localization_3d.launch.py')),
             launch_arguments={'use_sim_time': use_sim_time}.items(),
         ),

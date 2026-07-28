@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.8)
-project(libbot_mapping)
+project(libbot_fastlio)
 
 find_package(ament_cmake REQUIRED)
 
@@ -10,6 +10,9 @@ install(DIRECTORY config launch maps
 install(PROGRAMS
   scripts/pcd_to_2d_map.py
   scripts/mapping_preview_node.py
+  libbot_fastlio/fastlio_map_odom_bridge.py
+  libbot_fastlio/global_localization.py
+  libbot_fastlio/publish_initial_pose.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

@@ -657,8 +657,32 @@ void LibbotControlPanel::onStopLocalization()
   log("Localization stopped");
 }
 
+void LibbotControlPanel::stopRobotImmediately()
+{
+  // Killing controller_server/bt_navigator (below, via switch_mode.sh
+  // stop) doesn't stop the robot *instantly* -- it's an async process
+  // kill that takes ~1s (stop_stack's own sleep), and until those
+  // processes actually die, DWB can still publish one more cmd_vel
+  // toward the goal. Cancel the active goal and zero cmd_vel directly
+  // first so motion actually stops right away instead of racing the
+  // process kill; repeated once after the kill window to override any
+  // straggler command sent in that ~1s gap.
+  if (nav_action_client_) {
+    nav_action_client_->async_cancel_all_goals();
+  }
+  if (cmd_pub_) {
+    cmd_pub_->publish(geometry_msgs::msg::Twist());
+  }
+  QTimer::singleShot(1200, this, [this]() {
+    if (cmd_pub_) {
+      cmd_pub_->publish(geometry_msgs::msg::Twist());
+    }
+  });
+}
+
 void LibbotControlPanel::onStopNavigation()
 {
+  stopRobotImmediately();
   QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
   navigation_active_ = false;
   updateModeButtons();
@@ -667,6 +691,7 @@ void LibbotControlPanel::onStopNavigation()
 
 void LibbotControlPanel::onStopAll()
 {
+  stopRobotImmediately();
   QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
   mapping_active_ = false;
   localization_active_ = false;
@@ -785,7 +810,7 @@ void LibbotControlPanel::onSaveMap()
             }
           });
         convert_process_->start(
-          "ros2", {"run", "libbot_mapping", "pcd_to_2d_map.py", pcdPath(), name,
+          "ros2", {"run", "libbot_fastlio", "pcd_to_2d_map.py", pcdPath(), name,
             "--output-dir", mapsDir(), "--pcd-output-dir", pcdMapsDir()});
       });
     });
@@ -828,17 +853,17 @@ void LibbotControlPanel::onRefreshMaps()
 
 QString LibbotControlPanel::mapsDir() const
 {
-  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/maps";
+  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_fastlio/maps";
 }
 
 QString LibbotControlPanel::pcdPath() const
 {
-  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd";
+  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd";
 }
 
 QString LibbotControlPanel::pcdMapsDir() const
 {
-  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps";
+  return QDir::homePath() + "/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps";
 }
 
 QString LibbotControlPanel::selectedMapYamlPath() const

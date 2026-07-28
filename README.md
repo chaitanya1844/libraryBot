@@ -31,12 +31,9 @@ ros2_ws/src/
 ├── libbot_gazebo_plugins    Link-attacher Gazebo world plugin (AttachLink/DetachLink services) for pick/place
 ├── libbot_control           mecanum_drive_controller + arm_controller + joint_state_broadcaster (ros2_control) config/launch
 ├── libbot_manipulation      book_catalog.yaml, shelf_catalog.yaml, the Nav2+arm task manager (task_manager_node.py)
-├── libbot_localization      robot_localization EKF + FAST-LIO2 (3D lidar-inertial) localization config/launch
-├── fast_lio_localization    Vendored ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION -- ICP relocalization against a saved PCD
-├── libbot_mapping           FAST-LIO2 mapping launch, PCD->2D map converter, saved maps/PCDs
+├── libbot_fastlio           EKF + FAST-LIO2 mapping/localization: PCD save, PCD->2D map converter, ICP relocalization against a saved map (vendored from HViktorTsoi/FAST_LIO_LOCALIZATION, see its README.fast_lio_localization.md), all config/launch
 ├── libbot_navigation        Nav2 params (holonomic DWB tuning) + launch + RViz config
 ├── libbot_perception        Lidar->2D scan, 3D-lidar-to-Velodyne-format adapter (for FAST-LIO2), self-hit filtering
-├── libbot_control_panel     Standalone PyQt5 GUI (legacy/headless fallback)
 ├── libbot_rviz_plugins      Native RViz2 panel (C++/Qt): the primary control surface, embedded in RViz
 └── libbot_bringup           Top-level launch files (simulation.launch.py, autonomy.launch.py, switch_mode.sh)
 ```
@@ -93,7 +90,7 @@ bash ~/libraryBot/ros2_ws/src/libbot_bringup/scripts/switch_mode.sh stop
 ```
 
 Save the map after driving around in mapping mode (writes
-`libbot_mapping/pcd_maps/latest.pcd` -- **not** SIGINT/Ctrl-C, which
+`libbot_fastlio/pcd_maps/latest.pcd` -- **not** SIGINT/Ctrl-C, which
 doesn't write this path in this FAST_LIO ROS2 port):
 
 ```bash
@@ -103,10 +100,10 @@ ros2 service call /map_save std_srvs/srv/Trigger
 Convert the PCD to the 2D map Nav2's costmaps need:
 
 ```bash
-ros2 run libbot_mapping pcd_to_2d_map.py ~/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd my_map_name
+ros2 run libbot_fastlio pcd_to_2d_map.py ~/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd my_map_name
 ```
-Writes `my_map_name.yaml`/`.pgm` into `libbot_mapping/maps/`. Then
-`switch_mode.sh localization ~/libraryBot/ros2_ws/src/libbot_mapping/maps/my_map_name.yaml`
+Writes `my_map_name.yaml`/`.pgm` into `libbot_fastlio/maps/`. Then
+`switch_mode.sh localization ~/libraryBot/ros2_ws/src/libbot_fastlio/maps/my_map_name.yaml`
 -- this also always points `pcd_map_path` at the same `latest.pcd`, used
 by `fast_lio_localization` (real ICP relocalization against it, see
 below) for continuous correction. FAST-LIO2 itself has no "localize
@@ -166,7 +163,7 @@ Notes if you touch this stack:
   While mapping (no prior map), it auto-aligns once at startup from the
   current pose. While localizing (`use_external_localization:=true`), it
   instead relays `/map_to_odom` from `fast_lio_localization` (a vendored
-  ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION, `ros2_ws/src/fast_lio_localization`)
+  ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION, `ros2_ws/src/libbot_fastlio`)
   -- real coarse-to-fine ICP against the saved PCD, seeded by "2D Pose
   Estimate", not a one-shot blind guess (that wasn't reliable: this run's
   camera_init has no relationship to whatever old session's frame the
@@ -228,8 +225,8 @@ same topic Nav2 and the panel use. If not detected: `ls /dev/input/js*`.
 | Mecanum kinematics | `libbot_control/config/controllers.yaml` (`kinematics.*`) |
 | Canonical velocity command topic | `/libbot/mecanum_drive_controller/reference_unstamped` |
 | Spawn location | `libbot_gazebo/launch/spawn_robot.launch.py` args `x`/`y`/`yaw` |
-| EKF sensor fusion weights | `libbot_localization/config/ekf.yaml` |
-| FAST-LIO2 tuning, map save path | `libbot_localization/config/fast_lio_libbot.yaml` |
+| EKF sensor fusion weights | `libbot_fastlio/config/ekf.yaml` |
+| FAST-LIO2 tuning, map save path | `libbot_fastlio/config/fast_lio_libbot.yaml` |
 | Nav2: velocity/accel limits, critics, costmaps, BT | `libbot_navigation/config/nav2_params.yaml` |
 | Books / approach poses | `libbot_manipulation/config/book_catalog.yaml` -- must match `library.world` |
 | Shelf locations / approach poses | `libbot_manipulation/config/shelf_catalog.yaml` |

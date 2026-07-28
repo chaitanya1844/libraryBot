@@ -8,7 +8,7 @@
 
 set -u
 MODE="${1:-}"
-MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml}"
+MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_fastlio/maps/library.yaml}"
 
 # Everything that could own map->odom, plus the full Nav2 autonomy stack
 # that sits on top of localization. Matches the same process-name
@@ -35,10 +35,10 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml}"
 # map and switching back to localization kept showing the *old* one in
 # RViz's FastLioCloud display -- not a caching/display bug, a real
 # stale process serving genuinely stale data.
-STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|pcd_to_pointcloud|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
+STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|pcd_to_pointcloud|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
 
 # FAST-LIO2 replaced AMCL as the localization source (see
-# libbot_localization/launch/localization_fastlio.launch.py) -- it lives
+# libbot_fastlio/launch/localization_fastlio.launch.py) -- it lives
 # in a separate ~/fastlio_ws overlay workspace since it isn't packaged
 # for apt, so it has to be sourced here explicitly, on top of whatever
 # ROS/libraryBot environment this script inherited.
@@ -79,7 +79,7 @@ case "$MODE" in
   mapping)
     stop_stack
     source_fastlio_ws
-    ros2 launch libbot_mapping mapping.launch.py &
+    ros2 launch libbot_fastlio mapping.launch.py &
     ;;
   localization)
     stop_stack
@@ -96,14 +96,14 @@ case "$MODE" in
     # Falls back to latest.pcd only if no matching named PCD exists yet
     # (maps saved before this fix).
     MAP_BASENAME="$(basename "${MAP_PATH}" .yaml)"
-    NAMED_PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/${MAP_BASENAME}.pcd"
+    NAMED_PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/${MAP_BASENAME}.pcd"
     if [ -f "$NAMED_PCD_PATH" ]; then
       PCD_PATH="$NAMED_PCD_PATH"
     else
-      PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+      PCD_PATH="$HOME/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd"
       echo "switch_mode.sh: no ${MAP_BASENAME}.pcd, falling back to latest.pcd (may not match ${MAP_BASENAME}.yaml)" >&2
     fi
-    ros2 launch libbot_localization localization_fastlio.launch.py \
+    ros2 launch libbot_fastlio localization_fastlio.launch.py \
       "map:=${MAP_PATH}" "pcd_map_path:=${PCD_PATH}" &
     ;;
   navigation)

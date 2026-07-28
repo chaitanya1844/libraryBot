@@ -6,7 +6,7 @@ TF ownership:
     FAST-LIO2 (if enabled)  : map -> odom, via fastlio_map_odom_bridge
                               (see localization_fastlio.launch.py)
     FAST-LIO2 (mapping)    : map -> camera_init -> body, no map -> odom
-                              at all (see libbot_mapping/mapping.launch.py) --
+                              at all (see libbot_fastlio/mapping.launch.py) --
                               mutually exclusive with the above regardless
 
 `use_amcl` is a legacy name kept for backward compatibility with
@@ -17,8 +17,8 @@ localization_fastlio.launch.py and the README's "3D localization"
 section for why (redundant to run two localization sources at once, and
 this is what the 3D lidar is actually for).
 
-    ros2 launch libbot_localization localization.launch.py
-    ros2 launch libbot_localization localization.launch.py use_amcl:=true map:=/path/to/map.yaml
+    ros2 launch libbot_fastlio localization.launch.py
+    ros2 launch libbot_fastlio localization.launch.py use_amcl:=true map:=/path/to/map.yaml
 """
 import os
 
@@ -32,7 +32,7 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    pkg_share = get_package_share_directory('libbot_localization')
+    pkg_share = get_package_share_directory('libbot_fastlio')
 
     use_sim_time = LaunchConfiguration('use_sim_time')
     use_amcl = LaunchConfiguration('use_amcl')
@@ -43,10 +43,10 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('use_amcl', default_value='false',
                                description='Localize against a saved map with FAST-LIO2. '
-                                            'Leave false while mapping (libbot_mapping '
+                                            'Leave false while mapping (libbot_fastlio '
                                             'mapping.launch.py).'),
         DeclareLaunchArgument('map', default_value=os.path.join(
-            get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
+            get_package_share_directory('libbot_fastlio'), 'maps', 'library.yaml')),
         DeclareLaunchArgument('ekf_config', default_value=os.path.join(pkg_share, 'config', 'ekf.yaml')),
 
         Node(

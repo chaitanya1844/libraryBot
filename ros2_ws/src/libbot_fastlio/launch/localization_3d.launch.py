@@ -26,7 +26,7 @@ hardware, and aren't available via apt), e.g.:
     source /opt/ros/humble/setup.bash
     source ~/fastlio_ws/install/setup.bash
     source ~/libraryBot/ros2_ws/install/setup.bash
-    ros2 launch libbot_localization localization_3d.launch.py
+    ros2 launch libbot_fastlio localization_3d.launch.py
 """
 import os
 
@@ -44,7 +44,7 @@ def generate_launch_description():
     config_file = LaunchConfiguration('config_file')
 
     fast_lio_share = get_package_share_directory('fast_lio')
-    libbot_localization_share = get_package_share_directory('libbot_localization')
+    libbot_fastlio_share = get_package_share_directory('libbot_fastlio')
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
@@ -76,7 +76,7 @@ def generate_launch_description():
                 os.path.join(fast_lio_share, 'launch', 'mapping.launch.py')),
             launch_arguments={
                 'use_sim_time': use_sim_time,
-                'config_path': os.path.join(libbot_localization_share, 'config'),
+                'config_path': os.path.join(libbot_fastlio_share, 'config'),
                 'config_file': config_file,
                 'rviz': rviz,
             }.items(),

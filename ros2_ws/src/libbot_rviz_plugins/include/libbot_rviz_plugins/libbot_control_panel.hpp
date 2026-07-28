@@ -85,6 +85,7 @@ private:
   QString selectedMapYamlPath() const;
   void updateMapView();
   void sendGoalTo(double x, double y);
+  void stopRobotImmediately();
   bool eventFilter(QObject * watched, QEvent * event) override;
 
   rclcpp::Node::SharedPtr node_;

@@ -9,7 +9,7 @@ it, plus the same 3D lidar Velodyne-format adapter + FAST-LIO2
 
 Real relocalization against `pcd_map_path` (a PCD saved by a previous
 fastlio_mapping run -- see pcd_to_2d_map.py's docstring for how that PCD
-also becomes the `map` arg's 2D yaml/pgm) is fast_lio_localization's
+also becomes the `map` arg's 2D yaml/pgm) is libbot_fastlio's
 `global_localization.py`: a ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION,
 proper coarse-to-fine ICP against the saved map, seeded by RViz's
 "2D Pose Estimate" (same as AMCL needs) and continuously re-registering
@@ -25,7 +25,7 @@ localization_3d.launch.py:
     source /opt/ros/humble/setup.bash
     source ~/fastlio_ws/install/setup.bash
     source ~/libraryBot/ros2_ws/install/setup.bash
-    ros2 launch libbot_localization localization_fastlio.launch.py \\
+    ros2 launch libbot_fastlio localization_fastlio.launch.py \\
         map:=/path/to/name.yaml pcd_map_path:=/path/to/name.pcd
 """
 import os
@@ -46,9 +46,9 @@ def generate_launch_description():
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('map', default_value=os.path.join(
-            get_package_share_directory('libbot_mapping'), 'maps', 'library.yaml')),
+            get_package_share_directory('libbot_fastlio'), 'maps', 'library.yaml')),
         DeclareLaunchArgument('pcd_map_path', default_value=os.path.expanduser(
-            '~/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd')),
+            '~/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd')),
 
         Node(
             package='nav2_map_server',
@@ -73,7 +73,7 @@ def generate_launch_description():
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(
-                get_package_share_directory('libbot_localization'),
+                get_package_share_directory('libbot_fastlio'),
                 'launch', 'localization_3d.launch.py')),
             launch_arguments={
                 'use_sim_time': use_sim_time,
@@ -87,9 +87,9 @@ def generate_launch_description():
         ),
 
         Node(
-            package='fast_lio_localization',
+            package='libbot_fastlio',
             executable='global_localization.py',
-            name='fast_lio_localization',
+            name='global_localization',
             output='screen',
             parameters=[{
                 'use_sim_time': use_sim_time,
@@ -105,7 +105,7 @@ def generate_launch_description():
         ),
 
         Node(
-            package='libbot_localization',
+            package='libbot_fastlio',
             executable='fastlio_map_odom_bridge.py',
             name='fastlio_map_odom_bridge',
             output='screen',
