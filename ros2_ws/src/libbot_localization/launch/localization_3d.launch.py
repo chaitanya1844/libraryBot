@@ -41,6 +41,7 @@ from launch_ros.actions import Node
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
     rviz = LaunchConfiguration('rviz')
+    config_file = LaunchConfiguration('config_file')
 
     fast_lio_share = get_package_share_directory('fast_lio')
     libbot_localization_share = get_package_share_directory('libbot_localization')
@@ -49,6 +50,10 @@ def generate_launch_description():
         DeclareLaunchArgument('use_sim_time', default_value='true'),
         DeclareLaunchArgument('rviz', default_value='false',
                                description='Launch FAST-LIO2\'s own RViz config'),
+        DeclareLaunchArgument('config_file', default_value='fast_lio_libbot.yaml',
+                               description='fast_lio_libbot_localize.yaml (map_en/pcd_save off) '
+                                            'when localizing against an already-saved PCD instead '
+                                            '-- see localization_fastlio.launch.py.'),
 
         # Gazebo's ray sensor has no per-point ring/time capture (the
         # whole cloud arrives at one simulation instant) -- FAST-LIO's
@@ -72,7 +77,7 @@ def generate_launch_description():
             launch_arguments={
                 'use_sim_time': use_sim_time,
                 'config_path': os.path.join(libbot_localization_share, 'config'),
-                'config_file': 'fast_lio_libbot.yaml',
+                'config_file': config_file,
                 'rviz': rviz,
             }.items(),
         ),

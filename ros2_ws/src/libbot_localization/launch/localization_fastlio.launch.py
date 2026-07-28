@@ -75,7 +75,15 @@ def generate_launch_description():
             PythonLaunchDescriptionSource(os.path.join(
                 get_package_share_directory('libbot_localization'),
                 'launch', 'localization_3d.launch.py')),
-            launch_arguments={'use_sim_time': use_sim_time}.items(),
+            launch_arguments={
+                'use_sim_time': use_sim_time,
+                # map_en/pcd_save off: FAST-LIO2 has no localize-only mode
+                # (always runs live SLAM), but there's no reason to have it
+                # accumulate its own point cloud on top of the fixed PCD
+                # we're actually localizing against -- just a "why does it
+                # look like it's still mapping" distraction otherwise.
+                'config_file': 'fast_lio_libbot_localize.yaml',
+            }.items(),
         ),
 
         Node(
@@ -102,5 +110,26 @@ def generate_launch_description():
             name='fastlio_map_odom_bridge',
             output='screen',
             parameters=[{'use_sim_time': use_sim_time, 'use_external_localization': True}],
+        ),
+
+        # Static visualization of the actual PCD being localized against
+        # (RViz's FastLioCloud display) -- with map_en off (see above)
+        # there's otherwise nothing at all shown in 3D for "the map"
+        # during localization. Republishes periodically (interval, not a
+        # single one-shot publish) since it's Volatile QoS: a late
+        # subscriber (RViz reconnecting, etc.) would otherwise never see
+        # a one-shot publish that already happened.
+        Node(
+            package='pcl_ros',
+            executable='pcd_to_pointcloud',
+            name='pcd_to_pointcloud',
+            output='screen',
+            parameters=[{
+                'use_sim_time': use_sim_time,
+                'file_name': pcd_map_path,
+                'tf_frame': 'map',
+                'interval': 5.0,
+            }],
+            remappings=[('cloud_pcd', '/Laser_map')],
         ),
     ])

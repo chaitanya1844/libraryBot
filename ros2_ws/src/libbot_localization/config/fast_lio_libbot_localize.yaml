@@ -1,0 +1,68 @@
+/**:
+    ros__parameters:
+        feature_extract_enable: false
+        point_filter_num: 4
+        max_iteration: 3
+        filter_size_surf: 0.5
+        filter_size_map: 0.5
+        cube_side_length: 1000.0
+        runtime_pos_log_enable: false
+        # Same as fast_lio_libbot.yaml's map_file_path -- unused here since
+        # map_en is off (see below), just present so /map_save (if ever
+        # called by mistake during localization) doesn't crash for
+        # missing this parameter.
+        map_file_path: "/home/sychic/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+
+        common:
+            lid_topic:  "/libbot/lidar_3d/points_velodyne"
+            imu_topic:  "/libbot/imu/data_raw"
+            time_sync_en: false
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 2                # Velodyne-style: matches lidar_3d_velodyne_adapter's synthesized ring+time fields
+            scan_line: 16                # must match libbot_lidar_3d's `channels` (see libbot.urdf.xacro)
+            scan_rate: 5                 # must match libbot_lidar_3d's `hz` (see libbot.urdf.xacro)
+            timestamp_unit: 0            # adapter emits `time` in seconds
+            blind: 0.3
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            fov_degree: 360.0
+            det_range: 25.0              # matches libbot_lidar_3d's max_range
+            extrinsic_est_en: false
+            # lidar_3d_link position expressed in imu_link's frame, both
+            # axis-aligned with base_link (fixed joints, rpy 0 0 0):
+            # lidar z = chassis_z/2 + mast_height + 0.15 = 0.645
+            # imu z   = chassis_z/2 + 0.01            = 0.385
+            # (see base.urdf.xacro / payload_platform.urdf.xacro / libbot.urdf.xacro)
+            extrinsic_T: [0.0, 0.0, 0.26]
+            extrinsic_R: [1.0, 0.0, 0.0,
+                          0.0, 1.0, 0.0,
+                          0.0, 0.0, 1.0]
+
+        publish:
+            path_en: true
+            scan_publish_en: true
+            dense_publish_en: true
+            scan_bodyframe_pub_en: true
+            # Off here, unlike fast_lio_libbot.yaml: FAST-LIO2 has no
+            # "localize-only" mode, it always runs live SLAM and this flag
+            # is what makes it accumulate that into pcl_wait_pub
+            # (/Laser_map) regardless -- during localization we're using
+            # fast_lio_localization's ICP against the already-saved PCD
+            # instead, so that accumulating cloud is just a pure-visual
+            # "why does it look like it's still mapping" distraction with
+            # no purpose. cloud_registered (the current-scan-only topic,
+            # what fast_lio_localization actually consumes) is unaffected
+            # -- only publish_map()/pcl_wait_pub is gated on this.
+            map_en: false
+
+        pcd_save:
+            # Also off: /map_save would just overwrite the PCD you're
+            # actively localizing against with a mid-session partial one.
+            pcd_save_en: false
+            interval: -1
