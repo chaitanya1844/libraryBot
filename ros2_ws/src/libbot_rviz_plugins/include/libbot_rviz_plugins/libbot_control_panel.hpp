@@ -69,6 +69,7 @@ private Q_SLOTS:
   void onRefreshMaps();
   void onSpinTimer();
   void onUiTimer();
+  void onSendGoal();
 
 private:
   void setEStop(bool engaged);
@@ -136,6 +137,11 @@ private:
   QTextEdit * log_view_{nullptr};
 
   QSlider * arm_sliders_[4]{nullptr, nullptr, nullptr, nullptr};
+
+  // manual Nav2 goal send (workaround for RViz's 3D-viewport click tool
+  // not registering clicks in this remote-desktop environment)
+  QDoubleSpinBox * goal_x_{nullptr};
+  QDoubleSpinBox * goal_y_{nullptr};
 };
 
 }  // namespace libbot_rviz_plugins

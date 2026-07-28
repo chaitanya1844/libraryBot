@@ -180,10 +180,29 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   mode_grid->addWidget(start_navigation_button_, 3, 0, 1, 3);
   mode_grid->addWidget(stop_navigation_button_, 3, 3);
 
+  // RViz's own "Nav2 Goal" toolbar tool (click-and-drag on the 3D view)
+  // didn't register any click in a remote-desktop test environment --
+  // same class of input-routing quirk already seen with the standalone
+  // PyQt5 panel's buttons there, just hitting RViz's 3D viewport instead
+  // this time. Goal X/Y fields here send the exact same NavigateToPose
+  // action goal without needing that 3D-view drag gesture at all.
+  goal_x_ = new QDoubleSpinBox();
+  goal_x_->setRange(-100.0, 100.0);
+  goal_x_->setDecimals(2);
+  goal_y_ = new QDoubleSpinBox();
+  goal_y_->setRange(-100.0, 100.0);
+  goal_y_->setDecimals(2);
+  auto * send_goal_btn = new QPushButton("Send Goal");
+  connect(send_goal_btn, &QPushButton::clicked, this, &LibbotControlPanel::onSendGoal);
+  mode_grid->addWidget(new QLabel("Goal X/Y:"), 4, 0);
+  mode_grid->addWidget(goal_x_, 4, 1);
+  mode_grid->addWidget(goal_y_, 4, 2);
+  mode_grid->addWidget(send_goal_btn, 4, 3);
+
   auto * stop_all_btn = new QPushButton("STOP EVERYTHING");
   stop_all_btn->setStyleSheet("QPushButton { background-color: #922b21; color: white; font-weight: bold; }");
   connect(stop_all_btn, &QPushButton::clicked, this, &LibbotControlPanel::onStopAll);
-  mode_grid->addWidget(stop_all_btn, 4, 0, 1, 4);
+  mode_grid->addWidget(stop_all_btn, 5, 0, 1, 4);
 
   root->addWidget(mode_box);
   updateModeButtons();
@@ -516,6 +535,22 @@ void LibbotControlPanel::onStartNavigation()
     log("Navigation started");
   });
   log("Stowing arm before navigation...");
+}
+
+void LibbotControlPanel::onSendGoal()
+{
+  if (!nav_action_client_ || !nav_action_client_->action_server_is_ready()) {
+    log("Send Goal failed: navigate_to_pose action server not available -- Start Navigation first");
+    return;
+  }
+  nav2_msgs::action::NavigateToPose::Goal goal;
+  goal.pose.header.frame_id = "map";
+  goal.pose.header.stamp = node_->get_clock()->now();
+  goal.pose.pose.position.x = goal_x_->value();
+  goal.pose.pose.position.y = goal_y_->value();
+  goal.pose.pose.orientation.w = 1.0;
+  nav_action_client_->async_send_goal(goal);
+  log(QString("Goal sent: (%1, %2)").arg(goal_x_->value(), 0, 'f', 2).arg(goal_y_->value(), 0, 'f', 2));
 }
 
 void LibbotControlPanel::onStopMapping()

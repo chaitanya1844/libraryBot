@@ -1,282 +1,709 @@
 Panels:
   - Class: rviz_common/Displays
+    Help Height: 0
     Name: Displays
+    Property Tree Widget:
+      Expanded:
+        - /GlobalCostmap1
+        - /DepthCameraPointCloud1
+      Splitter Ratio: 0.5
+    Tree Height: 276
   - Class: libbot_rviz_plugins/LibbotControlPanel
     Name: libraryBot Controls
   - Class: rviz_common/Views
+    Expanded:
+      - /Current View1
     Name: Views
+    Splitter Ratio: 0.5
 Visualization Manager:
   Class: ""
   Displays:
-    - Class: rviz_default_plugins/Grid
-      Name: Grid
-      Enabled: true
+    - Alpha: 0.4000000059604645
+      Cell Size: 1
+      Class: rviz_default_plugins/Grid
       Color: 80; 80; 80
-      Alpha: 0.4
-
-    - Class: rviz_default_plugins/RobotModel
-      Name: RobotModel
+      Enabled: true
+      Line Style:
+        Line Width: 0.029999999329447746
+        Value: Lines
+      Name: Grid
+      Normal Cell Count: 0
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Plane: XY
+      Plane Cell Count: 10
+      Reference Frame: <Fixed Frame>
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/RobotModel
+      Collision Enabled: false
+      Description File: ""
+      Description Source: Topic
       Description Topic:
-        Value: /libbot/robot_description
         Depth: 1
         Durability Policy: Transient Local
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /libbot/robot_description
       Enabled: true
+      Links:
+        All Links Enabled: true
+        Expand Joint Details: false
+        Expand Link Details: false
+        Expand Tree: false
+        Link Tree Style: Links in Alphabetic Order
+        arm_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        base_footprint:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        book_tray_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        camera_accel_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_accel_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_bottom_screw_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_color_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_color_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_depth_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_depth_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_gyro_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_gyro_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_infra1_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_infra1_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_infra2_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_infra2_optical_frame:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+        camera_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        chassis_face_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        chassis_fascia_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        chassis_side_panel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        chassis_skirt_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        deck_stripe_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        face_eye_left_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        face_eye_right_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        forearm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        front_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        gripper_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        imu_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        lidar_3d_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_left_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        rear_right_wheel_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        sensor_mast_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        shoulder_pan_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        skid_plate_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        upper_arm_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        wrist_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+      Mass Properties:
+        Inertia: false
+        Mass: false
+      Name: RobotModel
+      TF Prefix: ""
+      Update Interval: 0
+      Value: true
       Visual Enabled: true
-
     - Class: rviz_default_plugins/TF
-      Name: TF
       Enabled: false
+      Frame Timeout: 15
+      Frames:
+        All Enabled: true
+      Marker Scale: 0.4000000059604645
+      Name: TF
+      Show Arrows: true
+      Show Axes: true
       Show Names: false
-      Marker Scale: 0.4
-
-    - Class: rviz_default_plugins/Map
+      Tree:
+        {}
+      Update Interval: 0
+      Value: false
+    - Alpha: 0.699999988079071
+      Class: rviz_default_plugins/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: true
       Name: Map
       Topic:
-        Value: /map
         Depth: 1
         Durability Policy: Transient Local
-      Alpha: 0.7
-      Enabled: true
-
-    # Live 2D preview while mapping (mapping_preview_node.py) -- FAST-LIO2
-    # itself has no equivalent of slam_toolbox's live 2D map, only the 3D
-    # /Laser_map cloud above; this re-projects that same cloud into an
-    # OccupancyGrid every couple seconds so there's visual feedback that
-    # mapping is progressing. Volatile (default rclpy QoS), not
-    # Transient Local like the real map above -- that one comes from
-    # map_server, this one doesn't.
-    - Class: rviz_default_plugins/Map
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map
+      Update Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /map_updates
+      Use Timestamp: false
+      Value: true
+    - Alpha: 0.699999988079071
+      Class: rviz_default_plugins/Map
+      Color Scheme: map
+      Draw Behind: false
+      Enabled: false
       Name: MappingPreview
       Topic:
-        Value: /mapping_preview_map
         Depth: 1
         Durability Policy: Volatile
-      Alpha: 0.7
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /mapping_preview_map
+      Update Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /mapping_preview_map_updates
+      Use Timestamp: false
+      Value: false
+    - Alpha: 0.20000000298023224
+      Class: rviz_default_plugins/Map
+      Color Scheme: costmap
+      Draw Behind: false
       Enabled: true
-
-    # Global/local Nav2 costmaps -- the rainbow magenta/cyan cost gradient.
-    - Class: rviz_default_plugins/Map
       Name: GlobalCostmap
       Topic:
-        Value: /global_costmap/costmap
         Depth: 1
         Durability Policy: Transient Local
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_costmap/costmap
+      Update Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_costmap/costmap_updates
+      Use Timestamp: false
+      Value: true
+    - Alpha: 0.6000000238418579
+      Class: rviz_default_plugins/Map
       Color Scheme: costmap
-      Alpha: 0.5
       Draw Behind: false
       Enabled: true
-
-    - Class: rviz_default_plugins/Map
       Name: LocalCostmap
       Topic:
-        Value: /local_costmap/costmap
         Depth: 1
         Durability Policy: Volatile
-      Color Scheme: costmap
-      Alpha: 0.6
-      Draw Behind: false
-      Enabled: true
-
-    - Class: rviz_default_plugins/LaserScan
-      Name: LaserScan
-      Topic:
-        Value: /scan
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/costmap
+      Update Topic:
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.04
-      Style: Flat Squares
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_costmap/costmap_updates
+      Use Timestamp: false
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/LaserScan
       Color: 255; 60; 60
+      Color Transformer: ""
+      Decay Time: 0
       Enabled: false
-
-    # Main 3D perception sensor: full 3D lidar point cloud, rainbow-colored
-    # by height (matches the reference visualization style).
-    # De-emphasized on purpose: this is the raw current-instant sensor
-    # scan, not the accumulated map (that's FastLioCloud/Laser_map below)
-    # -- kept small/dim so it doesn't visually compete with the map
-    # that's actually building up.
-    - Class: rviz_default_plugins/PointCloud2
-      Name: Lidar3D
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: LaserScan
+      Position Transformer: ""
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.03999999910593033
+      Style: Flat Squares
       Topic:
-        Value: /libbot/lidar_3d/points_filtered
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.02
-      Style: Flat Squares
-      Color Transformer: FlatColor
-      Color: 220; 90; 60
-      Alpha: 0.85
-      Autocompute Value Bounds: true
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /scan
       Use Fixed Frame: true
+      Use rainbow: true
+      Value: false
+    - Alpha: 0.8500000238418579
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 220; 90; 60
+      Color Transformer: FlatColor
+      Decay Time: 0
       Enabled: true
-
-    # On by default per user request. The D435i's raw depth cloud is
-    # ~307k points/frame (640x480), heavy enough to strain VRAM on
-    # constrained GPUs when rendered alongside Gazebo + the lidar cloud +
-    # costmaps -- if rviz2 crashes/stutters, disable this first (the 2D
-    # CameraColor image below gives the same "see what the camera sees"
-    # view far more cheaply) or lower width/height/hz in
-    # depth_camera_gazebo.urdf.xacro.
-    - Class: rviz_default_plugins/PointCloud2
-      Name: DepthCameraPointCloud
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: Lidar3D
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.019999999552965164
+      Style: Flat Squares
       Topic:
-        Value: /libbot/camera/camera/points
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.015
-      Style: Flat Squares
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /libbot/lidar_3d/points_filtered
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
+      Color: 255; 255; 255
       Color Transformer: RGB8
+      Decay Time: 0
       Enabled: true
-
-    # Off by default: rviz2's Image display allocates its own separate
-    # GL render target, which reliably crashed rviz2 on this box's GPU
-    # driver ("libGL error: failed to create drawable" -> Ogre
-    # "Vertex Buffer: Out of memory" -> SIGABRT), independent of the
-    # topic's actual bandwidth. Enable it if your GPU/driver handles
-    # multiple simultaneous GL contexts; otherwise view the camera with
-    # `ros2 run rqt_image_view rqt_image_view` instead, which renders in
-    # its own process and doesn't share rviz2's GL context.
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: DepthCameraPointCloud
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.019999999552965164
+      Style: Flat Squares
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /libbot/camera/camera/points
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
     - Class: rviz_default_plugins/Image
-      Name: CameraColor
-      Topic:
-        Value: /libbot/camera/camera/image_raw
-        Depth: 5
-        Durability Policy: Volatile
       Enabled: false
-
-    # FAST-LIO2's own registered 3D map + tracked trajectory -- this is
-    # Nav2's actual localization source now (see "2. Start Localization"
-    # in the control panel / localization_fastlio.launch.py), replacing
-    # AMCL, so on by default.
-    # /Laser_map, NOT /cloud_registered: the latter is only FAST-LIO2's
-    # current-instant scan (republished every frame, never accumulates)
-    # -- this is the actual growing map (pcl_wait_pub, only populated
-    # because fast_lio_libbot.yaml sets publish.map_en: true), highlighted
-    # (larger points) so it's obvious mapping is working. Yellow here
-    # specifically means *localizing* against a saved map -- mapping.launch.py
-    # remaps its own /Laser_map to /Laser_map_mapping (FastLioCloudMapping
-    # below, green) precisely so the two are never ambiguous on screen.
-    - Class: rviz_default_plugins/PointCloud2
-      Name: FastLioCloud
+      Max Value: 1
+      Median window: 5
+      Min Value: 0
+      Name: CameraColor
+      Normalize Range: true
       Topic:
-        Value: /Laser_map
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.03
-      Style: Flat Squares
-      Color Transformer: FlatColor
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /libbot/camera/camera/image_raw
+      Value: false
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 0
-      Alpha: 1.0
+      Color Transformer: FlatColor
+      Decay Time: 0
       Enabled: true
-
-    # Same data, mapping mode only (see mapping.launch.py's SetRemap) --
-    # green instead of yellow so it's never mistaken for FastLioCloud
-    # above (localizing against an already-saved map).
-    - Class: rviz_default_plugins/PointCloud2
-      Name: FastLioCloudMapping
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: FastLioCloud
+      Position Transformer: XYZ
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.029999999329447746
+      Style: Flat Squares
       Topic:
-        Value: /Laser_map_mapping
         Depth: 5
         Durability Policy: Volatile
-      Size (m): 0.03
-      Style: Flat Squares
-      Color Transformer: FlatColor
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /Laser_map
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Autocompute Intensity Bounds: true
+      Autocompute Value Bounds:
+        Max Value: 10
+        Min Value: -10
+        Value: true
+      Axis: Z
+      Channel Name: intensity
+      Class: rviz_default_plugins/PointCloud2
       Color: 40; 220; 40
-      Alpha: 1.0
+      Color Transformer: FlatColor
+      Decay Time: 0
       Enabled: true
-
-    - Class: rviz_default_plugins/Path
-      Name: FastLioPath
+      Invert Rainbow: false
+      Max Color: 255; 255; 255
+      Max Intensity: 4096
+      Min Color: 0; 0; 0
+      Min Intensity: 0
+      Name: FastLioCloudMapping
+      Position Transformer: ""
+      Selectable: true
+      Size (Pixels): 3
+      Size (m): 0.029999999329447746
+      Style: Flat Squares
       Topic:
-        Value: /path
+        Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /Laser_map_mapping
+      Use Fixed Frame: true
+      Use rainbow: true
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
       Color: 255; 0; 0
-      Line Width: 0.03
       Enabled: true
-
-    - Class: rviz_default_plugins/Path
-      Name: GlobalPlan
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: FastLioPath
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
       Topic:
-        Value: /plan
+        Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /path
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
       Color: 12; 227; 14
-      Line Width: 0.04
       Enabled: true
-
-    - Class: rviz_default_plugins/Path
-      Name: LocalPlan
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.03999999910593033
+      Name: GlobalPlan
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
       Topic:
-        Value: /local_plan
+        Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /plan
+      Value: true
+    - Alpha: 1
+      Buffer Length: 1
+      Class: rviz_default_plugins/Path
       Color: 255; 200; 0
-      Line Width: 0.03
       Enabled: true
-
-    # Breadcrumb trail of where the robot has actually driven in the last
-    # ~20s (published by libbot_perception's trail_publisher_node as a
-    # MarkerArray so each point can fade by age), distinct from
-    # GlobalPlan/LocalPlan above which show where it's *going* right now.
-    - Class: rviz_default_plugins/MarkerArray
-      Name: Trail
+      Head Diameter: 0.30000001192092896
+      Head Length: 0.20000000298023224
+      Length: 0.30000001192092896
+      Line Style: Lines
+      Line Width: 0.029999999329447746
+      Name: LocalPlan
+      Offset:
+        X: 0
+        Y: 0
+        Z: 0
+      Pose Color: 255; 85; 255
+      Pose Style: None
+      Radius: 0.029999999329447746
+      Shaft Diameter: 0.10000000149011612
+      Shaft Length: 0.10000000149011612
       Topic:
-        Value: /libbot/trail
+        Depth: 5
         Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /local_plan
+      Value: true
+    - Class: rviz_default_plugins/MarkerArray
       Enabled: true
-
-    # Nav2's actual planning footprint polygons -- shows the exact
-    # collision boundary the planner/controller reason about, not just
-    # the visual robot model. Useful for demonstrating *why* Nav2 picked
-    # a given path (e.g. why it won't cut a corner close to a shelf).
-    - Class: rviz_default_plugins/Polygon
+      Name: Trail
+      Namespaces:
+        {}
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /libbot/trail
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Polygon
+      Color: 255; 255; 0
+      Enabled: true
       Name: LocalFootprint
       Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /local_costmap/published_footprint
-        Durability Policy: Volatile
-      Color: 255; 255; 0
-      Enabled: true
-
-    - Class: rviz_default_plugins/Polygon
-      Name: GlobalFootprint
-      Topic:
-        Value: /global_costmap/published_footprint
-        Durability Policy: Volatile
+      Value: true
+    - Alpha: 1
+      Class: rviz_default_plugins/Polygon
       Color: 0; 255; 255
       Enabled: false
-
+      Name: GlobalFootprint
+      Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        Filter size: 10
+        History Policy: Keep Last
+        Reliability Policy: Reliable
+        Value: /global_costmap/published_footprint
+      Value: false
+  Enabled: true
   Global Options:
     Background Color: 20; 20; 24
     Fixed Frame: map
     Frame Rate: 30
+  Name: root
   Tools:
     - Class: rviz_default_plugins/Interact
+      Hide Inactive Objects: true
     - Class: rviz_default_plugins/MoveCamera
     - Class: rviz_default_plugins/Select
     - Class: nav2_rviz_plugins/GoalTool
     - Class: rviz_default_plugins/SetInitialPose
+      Covariance x: 0.25
+      Covariance y: 0.25
+      Covariance yaw: 0.06853891909122467
       Topic:
+        Depth: 5
+        Durability Policy: Volatile
+        History Policy: Keep Last
+        Reliability Policy: Reliable
         Value: /initialpose
+  Transformation:
+    Current:
+      Class: rviz_default_plugins/TF
   Value: true
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Name: Current View
-      Distance: 9
+      Distance: 9.059502601623535
+      Enable Stereo Rendering:
+        Stereo Eye Separation: 0.05999999865889549
+        Stereo Focal Distance: 1
+        Swap Stereo Eyes: false
+        Value: false
       Focal Point:
-        X: 1
-        Y: 3.3
-        Z: 0.4
-      Pitch: 0.9
-      Yaw: 1.0
-      Near Clip Distance: 0.01
+        X: 1.4154188632965088
+        Y: -2.270937204360962
+        Z: 0.5232104063034058
+      Focal Shape Fixed Size: true
+      Focal Shape Size: 0.05000000074505806
+      Invert Z Axis: false
+      Name: Current View
+      Near Clip Distance: 0.009999999776482582
+      Pitch: 1.483784556388855
+      Target Frame: <Fixed Frame>
+      Value: Orbit (rviz_default_plugins)
+      Yaw: 2.597468852996826
+    Saved: ~
 Window Geometry:
-  X: 0
-  Y: 74
-  Height: 1312
-  Width: 2560
+  CameraColor:
+    collapsed: false
   Displays:
     collapsed: false
-  libraryBot Controls:
-    collapsed: false
+  Height: 1312
+  Hide Left Dock: false
+  Hide Right Dock: false
+  QMainWindow State: 000000ff00000000fd00000001000000000000031600000484fc0200000004fb0000001600430061006d0065007200610043006f006c006f00720000000000ffffffff0000004a00fffffffb000000100044006900730070006c006100790073010000006e000001820000018200fffffffb00000026006c0069006200720061007200790042006f007400200043006f006e00740072006f006c007301000001fc000001b8000000b000fffffffb0000000a0056006900650077007301000003c0000001320000013200ffffff000006de0000048400000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
   Views:
-    collapsed: true
-  CameraColor:
+    collapsed: false
+  Width: 2560
+  X: 0
+  Y: 54
+  libraryBot Controls:
     collapsed: false
