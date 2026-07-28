@@ -57,9 +57,20 @@ transform is what actually fixes that.
 Also runs mapping_preview_node.py: FAST-LIO2 has no live 2D map the way
 slam_toolbox used to show one (the real 2D map only exists once,
 generated after the fact by pcd_to_2d_map.py against the saved PCD) --
-this republishes the same accumulating /Laser_map cloud as a live
-OccupancyGrid preview every couple seconds, purely for visual feedback
-that mapping is actually accumulating data while you drive.
+this republishes the same accumulating cloud as a live OccupancyGrid
+preview every couple seconds, purely for visual feedback that mapping is
+actually accumulating data while you drive.
+
+/Laser_map is remapped to /Laser_map_mapping here (SetRemap, applies
+through the nested include below to fastlio_mapping's own publisher):
+localization_fastlio.launch.py's fastlio_mapping instance publishes
+/Laser_map too (its own fresh live SLAM session, no "localize-only" mode
+exists), and RViz's FastLioCloud display needs to tell that apart from
+this mapping run's -- see libbot_nav.rviz (green while mapping, yellow
+while localizing). fast_lio_localization's global_localization.py
+doesn't consume /Laser_map at all (only /cloud_registered, /Odometry),
+so remapping it doesn't affect anything functional, only which RViz
+display picks it up.
 """
 import os
 
@@ -69,7 +80,7 @@ from launch.actions import IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch.actions import DeclareLaunchArgument
-from launch_ros.actions import Node
+from launch_ros.actions import Node, SetRemap
 
 
 def generate_launch_description():
@@ -91,9 +102,10 @@ def generate_launch_description():
             executable='mapping_preview_node.py',
             name='mapping_preview_node',
             output='screen',
-            parameters=[{'use_sim_time': use_sim_time}],
+            parameters=[{'use_sim_time': use_sim_time, 'input_topic': '/Laser_map_mapping'}],
         ),
 
+        SetRemap(src='/Laser_map', dst='/Laser_map_mapping'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(
                 get_package_share_directory('libbot_localization'),

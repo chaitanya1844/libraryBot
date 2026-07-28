@@ -151,7 +151,10 @@ Visualization Manager:
     # current-instant scan (republished every frame, never accumulates)
     # -- this is the actual growing map (pcl_wait_pub, only populated
     # because fast_lio_libbot.yaml sets publish.map_en: true), highlighted
-    # (bright yellow, larger points) so it's obvious mapping is working.
+    # (larger points) so it's obvious mapping is working. Yellow here
+    # specifically means *localizing* against a saved map -- mapping.launch.py
+    # remaps its own /Laser_map to /Laser_map_mapping (FastLioCloudMapping
+    # below, green) precisely so the two are never ambiguous on screen.
     - Class: rviz_default_plugins/PointCloud2
       Name: FastLioCloud
       Topic:
@@ -162,6 +165,22 @@ Visualization Manager:
       Style: Flat Squares
       Color Transformer: FlatColor
       Color: 255; 255; 0
+      Alpha: 1.0
+      Enabled: true
+
+    # Same data, mapping mode only (see mapping.launch.py's SetRemap) --
+    # green instead of yellow so it's never mistaken for FastLioCloud
+    # above (localizing against an already-saved map).
+    - Class: rviz_default_plugins/PointCloud2
+      Name: FastLioCloudMapping
+      Topic:
+        Value: /Laser_map_mapping
+        Depth: 5
+        Durability Policy: Volatile
+      Size (m): 0.03
+      Style: Flat Squares
+      Color Transformer: FlatColor
+      Color: 40; 220; 40
       Alpha: 1.0
       Enabled: true
 
