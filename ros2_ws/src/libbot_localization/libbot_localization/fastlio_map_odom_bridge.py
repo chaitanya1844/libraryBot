@@ -214,30 +214,27 @@ class FastLioMapOdomBridge(Node):
                     % (self._base_frame, self._body_frame, exc), throttle_duration_sec=2.0)
                 return
 
-        if not self._auto_aligned and not self._use_external_localization:
-            # Only for plain mapping (no prior map loaded): solve
-            # map -> camera_init so that map -> odom starts at identity
-            # right now (this run defines the map, so "wherever the robot
-            # currently is" is as good a map origin as any), instead of
-            # leaving camera_init's arbitrary IMU-height-relative origin
-            # baked into every point in the accumulated cloud. Composes
-            # through base_to_body (NOT treating body/IMU and base_footprint
-            # as the same point, which an earlier version of this fix did
-            # -- that left a permanent ~0.76m z bias baked into every map
-            # point, mistaken at the time for ordinary FAST-LIO2 drift since
-            # it never went away).
+        if not self._auto_aligned:
+            # Same placeholder either way: "wherever the robot currently
+            # is" as the map origin. Correct by construction in plain
+            # mapping mode (this run defines the map); in
+            # use_external_localization mode it's just a placeholder so
+            # RobotModel/TF have *something* to resolve immediately --
+            # publishing nothing at all until the first /map_to_odom
+            # arrived (an earlier version of this) meant RobotModel
+            # didn't render for however long it took to click "2D Pose
+            # Estimate" and get an accepted ICP fitness, which could be a
+            # while. _on_external_map_to_odom overwrites this with the
+            # real correction the moment one arrives; until then this is
+            # wrong exactly the same way AMCL's map->odom is wrong before
+            # its own first initial pose, not broken.
             self._map_to_camera_init = (
                 odom_to_base_m @ self._base_to_body @ np.linalg.inv(self._latest_camera_init_to_body))
             self._auto_aligned = True
             self.get_logger().info(
-                'Auto-aligned map<->camera_init from current odom->%s pose (z-corrected).'
-                % self._base_frame)
-
-        if not self._auto_aligned:
-            # use_external_localization, but /map_to_odom hasn't arrived
-            # yet (fast_lio_localization is still waiting on /initialpose
-            # itself) -- nothing valid to publish yet.
-            return
+                'Auto-aligned map<->camera_init from current odom->%s pose (z-corrected)%s.'
+                % (self._base_frame,
+                   ' -- placeholder until ICP corrects it' if self._use_external_localization else ''))
 
         # Also broadcast map->camera_init directly (not just folded into
         # map->odom below) so RViz can place FAST-LIO2's own outputs that

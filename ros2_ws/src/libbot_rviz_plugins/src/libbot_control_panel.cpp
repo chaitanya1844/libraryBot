@@ -480,6 +480,7 @@ void LibbotControlPanel::onStartMapping()
   localization_active_ = false;
   navigation_active_ = false;
   updateModeButtons();
+  resetDisplays();
   log("Mapping started");
 }
 
@@ -495,6 +496,7 @@ void LibbotControlPanel::onStartLocalization()
   localization_active_ = true;
   navigation_active_ = false;
   updateModeButtons();
+  resetDisplays();
   log("Localization started against '" + map_combo_->currentText() +
       "' -- use RViz's \"2D Pose Estimate\" to seed it");
 }
@@ -512,6 +514,7 @@ void LibbotControlPanel::onStopMapping()
   QProcess::startDetached("bash", {"-c", switchModeScript() + " stop"});
   mapping_active_ = false;
   updateModeButtons();
+  resetDisplays();
   log("Mapping stopped");
 }
 
@@ -521,6 +524,7 @@ void LibbotControlPanel::onStopLocalization()
   localization_active_ = false;
   navigation_active_ = false;
   updateModeButtons();
+  resetDisplays();
   log("Localization stopped");
 }
 
@@ -539,19 +543,25 @@ void LibbotControlPanel::onStopAll()
   localization_active_ = false;
   navigation_active_ = false;
   updateModeButtons();
+  resetDisplays();
+  log("Everything stopped, displays reset");
+}
 
+void LibbotControlPanel::resetDisplays()
+{
   // Displays (point clouds, paths, markers) otherwise keep showing their
   // last received message forever once the node publishing them is
-  // killed -- "ghosting" stale data from the stopped run. This panel is
-  // itself an RViz plugin living in the same process, so it can trigger
-  // the same reset the Displays panel's own "Reset" button does, instead
-  // of needing you to click that separately every time.
+  // killed/replaced -- "ghosting" stale data from a previous run (e.g.
+  // the localization map cloud still visible after switching straight
+  // to mapping without an intermediate Stop). This panel is itself an
+  // RViz plugin living in the same process, so it can trigger the same
+  // reset the Displays panel's own "Reset" button does, on every mode
+  // transition, not just Stop Everything.
   if (auto * ctx = getDisplayContext()) {
     if (auto * root = ctx->getRootDisplayGroup()) {
       root->reset();
     }
   }
-  log("Everything stopped, displays reset");
 }
 
 void LibbotControlPanel::updateModeButtons()

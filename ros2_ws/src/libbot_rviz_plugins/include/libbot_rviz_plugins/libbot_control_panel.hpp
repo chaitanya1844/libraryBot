@@ -74,6 +74,7 @@ private:
   void setEStop(bool engaged);
   void setTeleopButtonsEnabled(bool enabled);
   void updateModeButtons();
+  void resetDisplays();
   void setSavingUi(bool saving, const QString & status = QString());
   void log(const QString & text);
   QString mapsDir() const;
