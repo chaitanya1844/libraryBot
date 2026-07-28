@@ -24,7 +24,18 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_mapping/maps/library.yaml}"
 # Localization clicks, each still fully alive and consuming resources,
 # a real and significant contributor to this project's recurring
 # "system load creeps back up" symptom.
-STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
+# pcd_to_pointcloud: killing the ros2-launch *parent* (below) doesn't
+# kill already-spawned children -- Linux doesn't cascade kill -9 to a
+# process's children, they just get reparented to init and keep running
+# -- so every node a launch file starts still needs its own explicit
+# entry here regardless. Missed this one specifically: found 6 stacked
+# zombies (one per Start Localization click this session) still holding
+# their *original* map's PCD in memory forever (it loads the file once
+# at startup, never re-reads it), which is exactly why re-saving a new
+# map and switching back to localization kept showing the *old* one in
+# RViz's FastLioCloud display -- not a caching/display bug, a real
+# stale process serving genuinely stale data.
+STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|icp_odometry|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|pcd_to_pointcloud|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
 
 # FAST-LIO2 replaced AMCL as the localization source (see
 # libbot_localization/launch/localization_fastlio.launch.py) -- it lives
