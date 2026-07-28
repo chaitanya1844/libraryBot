@@ -33,14 +33,6 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   auto * content = new QWidget();
   auto * root = new QVBoxLayout(content);
 
-  // ---------------- status ----------------
-  auto * status_box = new QGroupBox("Status");
-  auto * status_grid = new QGridLayout(status_box);
-  pose_label_ = new QLabel("--");
-  status_grid->addWidget(new QLabel("<b>Pose:</b>"), 0, 0);
-  status_grid->addWidget(pose_label_, 0, 1);
-  root->addWidget(status_box);
-
   // ---------------- e-stop ----------------
   // Manual driving is done with the Xbox controller (see
   // `ros2 launch libbot_control teleop_joy.launch.py`, hold LB + move
@@ -56,9 +48,6 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
     "QPushButton:checked { background-color: #7b241c; }");
   connect(estop_button_, &QPushButton::toggled, this, &LibbotControlPanel::onEStopToggled);
   estop_v->addWidget(estop_button_);
-  auto * reset_pos_btn = new QPushButton("Reset Position");
-  connect(reset_pos_btn, &QPushButton::clicked, this, &LibbotControlPanel::onResetPosition);
-  estop_v->addWidget(reset_pos_btn);
   root->addWidget(estop_box);
 
   // ---------------- teleop override ----------------
@@ -226,6 +215,17 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
 
   root->addWidget(mode_box);
   updateModeButtons();
+
+  // ---------------- status ----------------
+  auto * status_box = new QGroupBox("Status");
+  auto * status_grid = new QGridLayout(status_box);
+  pose_label_ = new QLabel("--");
+  status_grid->addWidget(new QLabel("<b>Pose:</b>"), 0, 0);
+  status_grid->addWidget(pose_label_, 0, 1);
+  auto * reset_pos_btn = new QPushButton("Reset Position");
+  connect(reset_pos_btn, &QPushButton::clicked, this, &LibbotControlPanel::onResetPosition);
+  status_grid->addWidget(reset_pos_btn, 1, 0, 1, 2);
+  root->addWidget(status_box);
 
   // ---------------- log ----------------
   auto * log_box = new QGroupBox("Log");
