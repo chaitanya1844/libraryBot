@@ -32,7 +32,15 @@ class FastLIOLocalization(Node):
             parameters=[
                 ("map_voxel_size", 0.4),
                 ("scan_voxel_size", 0.1),
-                ("freq_localization", 0.5),
+                # Was 0.5 (every 2s): re-opening global re-registration
+                # that often gave repeated chances for a single bad match
+                # to compound (each pass is another shot at sliding to a
+                # wrong-but-plausible shelf row). FAST-LIO2's own
+                # /Odometry is accurate over the seconds-to-minutes
+                # between corrections here (no real wheel slip/drift in
+                # sim), so it can be trusted to carry the pose between
+                # much less frequent, higher-value global corrections.
+                ("freq_localization", 0.05),
                 ("freq_global_map", 0.25),
                 ("localization_threshold", 0.8),
                 ("fov", 6.28319),
@@ -99,12 +107,31 @@ class FastLIOLocalization(Node):
         return pc_array["xyz"]
     
     def registration_at_scale(self, scan, map, initial, scale):
+        # Point-to-plane instead of point-to-point: point-to-point only
+        # minimizes point-to-point distance, so in a map with repeated,
+        # near-identical geometry (rows of similar shelves here) it can
+        # converge with a *plausible* fitness score to the wrong row just
+        # as easily as the right one. Point-to-plane additionally weighs
+        # each correspondence by the target surface's local normal, which
+        # for planar/structured indoor scenes converges more accurately
+        # and is measurably less prone to sliding into a
+        # locally-consistent-but-globally-wrong alignment.
+        voxel = self.get_parameter("scan_voxel_size").value * scale
+        map_voxel = self.get_parameter("map_voxel_size").value * scale
+        scan_down = self.voxel_down_sample(scan, voxel)
+        map_down = self.voxel_down_sample(map, map_voxel)
+
+        normal_radius = map_voxel * 2.0
+        search_param = o3d.geometry.KDTreeSearchParamHybrid(radius=normal_radius, max_nn=30)
+        scan_down.estimate_normals(search_param)
+        map_down.estimate_normals(search_param)
+
         result_icp = o3d.pipelines.registration.registration_icp(
-        self.voxel_down_sample(scan, self.get_parameter("scan_voxel_size").value * scale),
-        self.voxel_down_sample(map, self.get_parameter("map_voxel_size").value * scale),
+        scan_down,
+        map_down,
         1.0 * scale,
         initial,
-        o3d.pipelines.registration.TransformationEstimationPointToPoint(),
+        o3d.pipelines.registration.TransformationEstimationPointToPlane(),
         o3d.pipelines.registration.ICPConvergenceCriteria(max_iteration=20),
         )
         return result_icp.transformation, result_icp.fitness

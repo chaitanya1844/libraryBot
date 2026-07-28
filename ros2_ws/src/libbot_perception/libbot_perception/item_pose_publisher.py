@@ -110,6 +110,18 @@ class ItemPosePublisher(Node):
         # so using (1.0, 0.4, ...) rendered the cube marker rotated 90
         # degrees off from the real shelf's footprint.
         self.declare_parameter('shelf_marker_scale', [0.4, 1.0, 1.8])
+        # map<->world is conceptually a fixed calibration constant, but
+        # recomputing it fresh every cycle from two independently-timed
+        # live sources (Gazebo's instantaneous ground truth vs. a TF
+        # lookup that lags slightly behind during active motion, since
+        # it flows through EKF fusion + rate-limited ICP corrections)
+        # let that transient mismatch leak straight into it while the
+        # robot drives -- items visibly jittering/shifting in sync with
+        # the robot's own motion, even though their true world position
+        # never changed. Exponential smoothing damps that out the same
+        # way it already fixed ICP correction jitter in
+        # fastlio_map_odom_bridge.py.
+        self.declare_parameter('calibration_smoothing_alpha', 0.15)
         self.declare_parameter('shelf_color_rgb', [0.15, 0.45, 0.95])
 
         self._robot_model_name = self.get_parameter('robot_model_name').value
@@ -118,6 +130,10 @@ class ItemPosePublisher(Node):
         self._color_rgb = self.get_parameter('color_rgb').value
         self._shelf_scale = self.get_parameter('shelf_marker_scale').value
         self._shelf_color_rgb = self.get_parameter('shelf_color_rgb').value
+        self._calib_alpha = self.get_parameter('calibration_smoothing_alpha').value
+        self._smoothed_map_to_world_xy = None
+        self._smoothed_map_to_world_z = None
+        self._smoothed_map_to_world_yaw = None
 
         self._tf_buffer = Buffer()
         self._tf_listener = TransformListener(self._tf_buffer, self)
@@ -139,6 +155,28 @@ class ItemPosePublisher(Node):
             f"cycle from Gazebo ground truth + map->{self._base_frame}, "
             f"no fixed spawn-pose assumption) and MarkerArray on "
             f"{self.get_parameter('marker_topic').value}.")
+
+    def _smooth_map_to_world(self, raw: np.ndarray) -> np.ndarray:
+        xy = raw[:2, 3]
+        z = raw[2, 3]
+        yaw = Rotation.from_matrix(raw[:3, :3]).as_euler('zyx')[0]
+
+        if self._smoothed_map_to_world_xy is None:
+            self._smoothed_map_to_world_xy = xy
+            self._smoothed_map_to_world_z = z
+            self._smoothed_map_to_world_yaw = yaw
+        else:
+            a = self._calib_alpha
+            self._smoothed_map_to_world_xy = self._smoothed_map_to_world_xy + a * (xy - self._smoothed_map_to_world_xy)
+            self._smoothed_map_to_world_z = self._smoothed_map_to_world_z + a * (z - self._smoothed_map_to_world_z)
+            dyaw = (yaw - self._smoothed_map_to_world_yaw + np.pi) % (2 * np.pi) - np.pi
+            self._smoothed_map_to_world_yaw = self._smoothed_map_to_world_yaw + a * dyaw
+
+        smoothed = np.eye(4)
+        smoothed[:3, :3] = Rotation.from_euler('z', self._smoothed_map_to_world_yaw).as_matrix()
+        smoothed[:2, 3] = self._smoothed_map_to_world_xy
+        smoothed[2, 3] = self._smoothed_map_to_world_z
+        return smoothed
 
     def _on_model_states(self, msg: ModelStates):
         name_to_index = {name: i for i, name in enumerate(msg.name)}
@@ -167,7 +205,8 @@ class ItemPosePublisher(Node):
         # straight into whatever "map" currently is, live, with no
         # fixed assumptions -- self-corrects after any teleport/reset
         # since it's rebuilt from ground truth every single cycle.
-        map_to_world = map_to_base @ np.linalg.inv(world_to_base)
+        raw_map_to_world = map_to_base @ np.linalg.inv(world_to_base)
+        map_to_world = self._smooth_map_to_world(raw_map_to_world)
 
         item_names = self.get_parameter('item_names').value
         shelf_names = self.get_parameter('shelf_names').value

@@ -108,7 +108,12 @@ class FastLioMapOdomBridge(Node):
         # off registration, e.g. from a momentarily bad scan, snapping
         # the whole map frame to a wrong pose instead of being ignored)
         # fixes both without adding meaningful lag to real corrections.
-        self.declare_parameter('icp_smoothing_alpha', 0.2)
+        # global_localization.py now re-registers far less often (every
+        # ~20s instead of every 2s -- see that node's freq_localization),
+        # so each correction represents more elapsed time and matters
+        # more; a higher alpha responds to it faster instead of taking
+        # several rare corrections (minutes) to catch up.
+        self.declare_parameter('icp_smoothing_alpha', 0.4)
         self.declare_parameter('icp_outlier_reject_m', 0.5)
         self.declare_parameter('icp_outlier_reject_rad', 0.35)
         self._odom_frame = self.get_parameter('odom_frame').value
