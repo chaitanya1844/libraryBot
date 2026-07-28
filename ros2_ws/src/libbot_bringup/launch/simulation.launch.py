@@ -128,10 +128,7 @@ def generate_launch_description():
             executable='item_pose_publisher.py',
             name='item_pose_publisher',
             output='screen',
-            parameters=[{
-                'use_sim_time': use_sim_time,
-                'spawn_x': x, 'spawn_y': y, 'spawn_yaw': yaw,
-            }],
+            parameters=[{'use_sim_time': use_sim_time}],
         )]),
 
         # 5. Localization: EKF always; SLAM (mapping) or AMCL (navigation) exclusively

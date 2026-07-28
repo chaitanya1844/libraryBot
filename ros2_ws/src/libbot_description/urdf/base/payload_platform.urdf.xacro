@@ -35,8 +35,14 @@
     <origin xyz="0 0 ${chassis_z/2 + mast_height/2}" rpy="0 0 0"/>
   </joint>
 
-  <!-- Book intake tray on the front, at an accessible low-middle height
-       on the body rather than tracking the (now much taller) body top. -->
+  <!-- Book collection basket on the front, at an accessible low-middle
+       height on the body. Same 0.16 x 0.24 footprint as the flat tray
+       this replaces (no change to the robot's overall size/silhouette),
+       just floor + 4 thin walls on that same footprint so books
+       book_sorter_node.py attaches here visually sit inside a basket
+       instead of floating on a bare plate. -->
+  <xacro:property name="basket_wall_h" value="0.08"/>
+  <xacro:property name="basket_wall_t" value="0.01"/>
   <link name="book_tray_link">
     <visual>
       <geometry><box size="0.16 0.24 0.02"/></geometry>
@@ -44,6 +50,44 @@
     </visual>
     <collision>
       <geometry><box size="0.16 0.24 0.02"/></geometry>
+    </collision>
+    <!-- Front/back walls (span y, thin in x) -->
+    <visual>
+      <origin xyz="0.075 0 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="${basket_wall_t} 0.24 ${basket_wall_h}"/></geometry>
+      <material name="libbot_body_teal"/>
+    </visual>
+    <collision>
+      <origin xyz="0.075 0 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="${basket_wall_t} 0.24 ${basket_wall_h}"/></geometry>
+    </collision>
+    <visual>
+      <origin xyz="-0.075 0 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="${basket_wall_t} 0.24 ${basket_wall_h}"/></geometry>
+      <material name="libbot_body_teal"/>
+    </visual>
+    <collision>
+      <origin xyz="-0.075 0 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="${basket_wall_t} 0.24 ${basket_wall_h}"/></geometry>
+    </collision>
+    <!-- Left/right walls (span x, thin in y) -->
+    <visual>
+      <origin xyz="0 0.115 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="0.16 ${basket_wall_t} ${basket_wall_h}"/></geometry>
+      <material name="libbot_body_teal"/>
+    </visual>
+    <collision>
+      <origin xyz="0 0.115 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="0.16 ${basket_wall_t} ${basket_wall_h}"/></geometry>
+    </collision>
+    <visual>
+      <origin xyz="0 -0.115 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="0.16 ${basket_wall_t} ${basket_wall_h}"/></geometry>
+      <material name="libbot_body_teal"/>
+    </visual>
+    <collision>
+      <origin xyz="0 -0.115 ${0.01 + basket_wall_h/2}" rpy="0 0 0"/>
+      <geometry><box size="0.16 ${basket_wall_t} ${basket_wall_h}"/></geometry>
     </collision>
     <inertial>
       <mass value="0.3"/>
