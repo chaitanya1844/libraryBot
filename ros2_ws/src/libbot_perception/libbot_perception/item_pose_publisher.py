@@ -45,6 +45,8 @@ without a restart:
     ros2 param set /item_pose_publisher item_names \\
         "['BookE_01_006', 'BookE_01_007', 'BookE_01_030', 'BookE_01_017']"
 """
+import copy
+
 import numpy as np
 import rclpy
 from rclpy.node import Node
@@ -103,7 +105,11 @@ class ItemPosePublisher(Node):
         self.declare_parameter('base_frame', 'base_footprint')
         self.declare_parameter('marker_scale', 0.12)
         self.declare_parameter('color_rgb', [1.0, 0.55, 0.0])
-        self.declare_parameter('shelf_marker_scale', [1.0, 0.4, 1.8])
+        # x/y swapped from the naive (long-axis-along-x) guess: the
+        # AWS retail bookshelf model's own long axis is local Y, not X,
+        # so using (1.0, 0.4, ...) rendered the cube marker rotated 90
+        # degrees off from the real shelf's footprint.
+        self.declare_parameter('shelf_marker_scale', [0.4, 1.0, 1.8])
         self.declare_parameter('shelf_color_rgb', [0.15, 0.45, 0.95])
 
         self._robot_model_name = self.get_parameter('robot_model_name').value
@@ -174,19 +180,25 @@ class ItemPosePublisher(Node):
             markers.markers.extend(self._track_one(
                 name, marker_id, name_to_index, msg, map_to_world, stamp,
                 'item_markers', 'item_labels', Marker.SPHERE,
-                (self._scale,) * 3, self._color_rgb, self._scale))
+                (self._scale,) * 3, self._color_rgb, self._scale, 0.0))
         for marker_id, name in enumerate(shelf_names):
+            # Shelf models' own origin is near their base (close to
+            # ground), not their geometric center -- centering a tall
+            # cube marker there put half of it visibly floating above
+            # where the shelf actually is. Shift up by half the cube's
+            # height so it rests on the origin instead of straddling it.
             markers.markers.extend(self._track_one(
                 name, 1000 + marker_id, name_to_index, msg, map_to_world, stamp,
                 'shelf_markers', 'shelf_labels', Marker.CUBE,
                 tuple(self._shelf_scale), self._shelf_color_rgb,
-                max(self._shelf_scale)))
+                max(self._shelf_scale), self._shelf_scale[2] / 2.0))
 
         if markers.markers:
             self._marker_pub.publish(markers)
 
     def _track_one(self, name, marker_id, name_to_index, msg, map_to_world, stamp,
-                    marker_ns, label_ns, marker_type, scale_xyz, color_rgb, label_offset):
+                    marker_ns, label_ns, marker_type, scale_xyz, color_rgb, label_offset,
+                    marker_z_offset):
         idx = name_to_index.get(name)
         if idx is None:
             if name not in self._missing_warned:
@@ -217,7 +229,13 @@ class ItemPosePublisher(Node):
         marker.id = marker_id * 2
         marker.type = marker_type
         marker.action = Marker.ADD
-        marker.pose = pose
+        # Deep-copied, not aliased to `pose` -- marker/label each need
+        # their own independent Pose object since label.pose gets its
+        # z shifted below; a shared reference here previously let that
+        # shift silently corrupt the marker's own z too (a real, large
+        # bug for shelves: label_offset=1.8 meant a spurious +2.7m).
+        marker.pose = copy.deepcopy(pose)
+        marker.pose.position.z += marker_z_offset
         marker.scale.x, marker.scale.y, marker.scale.z = scale_xyz
         r, g, b = color_rgb
         marker.color = ColorRGBA(r=r, g=g, b=b, a=0.85)
@@ -229,8 +247,8 @@ class ItemPosePublisher(Node):
         label.id = marker_id * 2 + 1
         label.type = Marker.TEXT_VIEW_FACING
         label.action = Marker.ADD
-        label.pose = pose
-        label.pose.position.z += label_offset * 1.5
+        label.pose = copy.deepcopy(pose)
+        label.pose.position.z += marker_z_offset + label_offset * 1.5
         label.scale.z = self._scale * 1.2
         label.color = ColorRGBA(r=1.0, g=1.0, b=1.0, a=0.9)
         label.text = name
