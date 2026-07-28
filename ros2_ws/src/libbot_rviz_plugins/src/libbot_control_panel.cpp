@@ -495,7 +495,8 @@ void LibbotControlPanel::onStartLocalization()
   localization_active_ = true;
   navigation_active_ = false;
   updateModeButtons();
-  log("Localization started against '" + map_combo_->currentText() + "'");
+  log("Localization started against '" + map_combo_->currentText() +
+      "' -- use RViz's \"2D Pose Estimate\" to seed it");
 }
 
 void LibbotControlPanel::onStartNavigation()
