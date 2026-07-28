@@ -98,7 +98,14 @@
   <joint name="book_tray_joint" type="fixed">
     <parent link="base_link"/>
     <child link="book_tray_link"/>
-    <origin xyz="0.14 0 ${-chassis_z/2 + 0.25}" rpy="0 0 0"/>
+    <!-- x was 0.14, well inside the chassis's own front face at
+         chassis_x/2=0.25 (chassis_x=0.50): the basket was entirely
+         embedded in the solid chassis box, invisible from outside
+         (same teal material as the chassis besides). Mounted just
+         proud of the front face instead so it actually protrudes and
+         is visible: chassis_x/2 + half the basket's own depth
+         (0.16/2=0.08), i.e. flush against the face. -->
+    <origin xyz="${chassis_x/2 + 0.08} 0 ${-chassis_z/2 + 0.25}" rpy="0 0 0"/>
   </joint>
 
   <gazebo reference="sensor_mast_link">
