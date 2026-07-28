@@ -45,8 +45,26 @@ STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_serve
 FASTLIO_WS_SETUP="$HOME/fastlio_ws/install/setup.bash"
 
 stop_stack() {
-  pkill -9 -f "$STOP_PATTERN" 2>/dev/null || true
-  sleep 1
+  # A single pkill -f call has repeatedly proven unreliable in this
+  # environment -- observed multiple times leaving the exact process it
+  # was told to kill still running (checked via ps/pgrep immediately
+  # after, with no intervening race). A survivor here means the *next*
+  # mapping/localization session shares its map->odom TF or, worse,
+  # its FAST-LIO2 accumulator with a leftover previous one -- exactly
+  # how "I saved a brand new map but it still shows the old one" kept
+  # happening even when the newly-saved files themselves were correct.
+  # Loop kill+verify a few times instead of trusting one shot.
+  for _ in 1 2 3 4 5; do
+    if ! pgrep -f "$STOP_PATTERN" >/dev/null 2>&1; then
+      break
+    fi
+    pkill -9 -f "$STOP_PATTERN" 2>/dev/null || true
+    sleep 1
+  done
+  if pgrep -f "$STOP_PATTERN" >/dev/null 2>&1; then
+    echo "switch_mode.sh: WARNING -- some matching processes survived stop_stack:" >&2
+    pgrep -af "$STOP_PATTERN" >&2 || true
+  fi
 }
 
 # Both mapping and localization run FAST-LIO2 (mapping.launch.py now
