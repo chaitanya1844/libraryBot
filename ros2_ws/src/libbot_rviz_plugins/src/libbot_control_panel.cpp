@@ -3,6 +3,10 @@
 #include <chrono>
 #include <cmath>
 
+#include <QImage>
+#include <QMouseEvent>
+#include <QPixmap>
+
 namespace libbot_rviz_plugins
 {
 
@@ -199,6 +203,22 @@ LibbotControlPanel::LibbotControlPanel(QWidget * parent)
   mode_grid->addWidget(goal_y_, 4, 2);
   mode_grid->addWidget(send_goal_btn, 4, 3);
 
+  // Click-to-goal map preview: RViz's own 3D-viewport "Nav2 Goal" tool
+  // never registers a click in this remote-desktop environment, but plain
+  // Qt widget clicks (like Send Goal above) do -- so this renders the live
+  // /map occupancy grid as an image and turns clicks on it into the same
+  // NavigateToPose goal, giving a working click-anywhere-on-the-map demo.
+  auto * map_click_box = new QGroupBox("Click Map to Send Goal");
+  auto * map_click_v = new QVBoxLayout(map_click_box);
+  map_view_ = new QLabel("(waiting for /map...)");
+  map_view_->setFixedSize(360, 360);
+  map_view_->setAlignment(Qt::AlignCenter);
+  map_view_->setFrameShape(QFrame::Box);
+  map_view_->setStyleSheet("QLabel { background-color: #222; color: #aaa; }");
+  map_view_->installEventFilter(this);
+  map_click_v->addWidget(map_view_);
+  root->addWidget(map_click_box);
+
   auto * stop_all_btn = new QPushButton("STOP EVERYTHING");
   stop_all_btn->setStyleSheet("QPushButton { background-color: #922b21; color: white; font-weight: bold; }");
   connect(stop_all_btn, &QPushButton::clicked, this, &LibbotControlPanel::onStopAll);
@@ -237,6 +257,13 @@ void LibbotControlPanel::onInitialize()
     [this](nav_msgs::msg::Odometry::SharedPtr msg) {
       std::lock_guard<std::mutex> lock(state_mutex_);
       latest_odom_ = msg;
+    });
+
+  map_sub_ = node_->create_subscription<nav_msgs::msg::OccupancyGrid>(
+    "/map", rclcpp::QoS(1).transient_local(),
+    [this](nav_msgs::msg::OccupancyGrid::SharedPtr msg) {
+      latest_map_ = msg;
+      updateMapView();
     });
 
   switch_controller_client_ = node_->create_client<controller_manager_msgs::srv::SwitchController>(
@@ -539,6 +566,11 @@ void LibbotControlPanel::onStartNavigation()
 
 void LibbotControlPanel::onSendGoal()
 {
+  sendGoalTo(goal_x_->value(), goal_y_->value());
+}
+
+void LibbotControlPanel::sendGoalTo(double x, double y)
+{
   if (!nav_action_client_ || !nav_action_client_->action_server_is_ready()) {
     log("Send Goal failed: navigate_to_pose action server not available -- Start Navigation first");
     return;
@@ -546,11 +578,64 @@ void LibbotControlPanel::onSendGoal()
   nav2_msgs::action::NavigateToPose::Goal goal;
   goal.pose.header.frame_id = "map";
   goal.pose.header.stamp = node_->get_clock()->now();
-  goal.pose.pose.position.x = goal_x_->value();
-  goal.pose.pose.position.y = goal_y_->value();
+  goal.pose.pose.position.x = x;
+  goal.pose.pose.position.y = y;
   goal.pose.pose.orientation.w = 1.0;
   nav_action_client_->async_send_goal(goal);
-  log(QString("Goal sent: (%1, %2)").arg(goal_x_->value(), 0, 'f', 2).arg(goal_y_->value(), 0, 'f', 2));
+  log(QString("Goal sent: (%1, %2)").arg(x, 0, 'f', 2).arg(y, 0, 'f', 2));
+}
+
+void LibbotControlPanel::updateMapView()
+{
+  if (!latest_map_ || latest_map_->info.width == 0 || latest_map_->info.height == 0) {
+    return;
+  }
+  const int w = static_cast<int>(latest_map_->info.width);
+  const int h = static_cast<int>(latest_map_->info.height);
+  QImage img(w, h, QImage::Format_Grayscale8);
+  for (int row = 0; row < h; ++row) {
+    // OccupancyGrid row 0 is the bottom (lowest y) row of the map, but
+    // QImage row 0 is the top -- flip vertically so the preview matches
+    // the map's actual orientation (and RViz's).
+    const int src_row = h - 1 - row;
+    uchar * line = img.scanLine(row);
+    for (int col = 0; col < w; ++col) {
+      const int8_t v = latest_map_->data[src_row * w + col];
+      line[col] = (v < 0) ? 128 : static_cast<uchar>(255 - (v * 255 / 100));
+    }
+  }
+  QPixmap pixmap = QPixmap::fromImage(img).scaled(
+    map_view_->size(), Qt::KeepAspectRatio, Qt::FastTransformation);
+  map_pixmap_size_ = pixmap.size();
+  map_view_->setPixmap(pixmap);
+}
+
+bool LibbotControlPanel::eventFilter(QObject * watched, QEvent * event)
+{
+  if (watched == map_view_ && event->type() == QEvent::MouseButtonPress) {
+    auto * me = static_cast<QMouseEvent *>(event);
+    if (latest_map_ && map_pixmap_size_.width() > 0 && map_pixmap_size_.height() > 0) {
+      const int offset_x = (map_view_->width() - map_pixmap_size_.width()) / 2;
+      const int offset_y = (map_view_->height() - map_pixmap_size_.height()) / 2;
+      const int px = me->pos().x() - offset_x;
+      const int py = me->pos().y() - offset_y;
+      if (px >= 0 && py >= 0 && px < map_pixmap_size_.width() && py < map_pixmap_size_.height()) {
+        const double scale_x = static_cast<double>(latest_map_->info.width) / map_pixmap_size_.width();
+        const double scale_y = static_cast<double>(latest_map_->info.height) / map_pixmap_size_.height();
+        const int col = static_cast<int>(px * scale_x);
+        const int row_from_top = static_cast<int>(py * scale_y);
+        const int row = static_cast<int>(latest_map_->info.height) - 1 - row_from_top;
+        const double res = latest_map_->info.resolution;
+        const double x = latest_map_->info.origin.position.x + (col + 0.5) * res;
+        const double y = latest_map_->info.origin.position.y + (row + 0.5) * res;
+        goal_x_->setValue(x);
+        goal_y_->setValue(y);
+        sendGoalTo(x, y);
+      }
+      return true;
+    }
+  }
+  return rviz_common::Panel::eventFilter(watched, event);
 }
 
 void LibbotControlPanel::onStopMapping()

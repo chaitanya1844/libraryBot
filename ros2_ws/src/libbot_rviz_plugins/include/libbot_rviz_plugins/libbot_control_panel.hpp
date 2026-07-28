@@ -17,6 +17,7 @@
 
 #include "geometry_msgs/msg/twist.hpp"
 #include "nav_msgs/msg/odometry.hpp"
+#include "nav_msgs/msg/occupancy_grid.hpp"
 #include "std_srvs/srv/set_bool.hpp"
 #include "std_srvs/srv/trigger.hpp"
 #include "controller_manager_msgs/srv/switch_controller.hpp"
@@ -82,10 +83,15 @@ private:
   QString pcdPath() const;
   QString pcdMapsDir() const;
   QString selectedMapYamlPath() const;
+  void updateMapView();
+  void sendGoalTo(double x, double y);
+  bool eventFilter(QObject * watched, QEvent * event) override;
 
   rclcpp::Node::SharedPtr node_;
   rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr cmd_pub_;
   rclcpp::Subscription<nav_msgs::msg::Odometry>::SharedPtr odom_sub_;
+  rclcpp::Subscription<nav_msgs::msg::OccupancyGrid>::SharedPtr map_sub_;
+  nav_msgs::msg::OccupancyGrid::SharedPtr latest_map_;
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav_action_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr map_save_client_;
@@ -142,6 +148,12 @@ private:
   // not registering clicks in this remote-desktop environment)
   QDoubleSpinBox * goal_x_{nullptr};
   QDoubleSpinBox * goal_y_{nullptr};
+
+  // clickable 2D map preview -- ordinary QLabel mouse clicks work fine
+  // in this environment (unlike Ogre 3D-viewport clicks), so this is the
+  // click-to-send-goal path for demos.
+  QLabel * map_view_{nullptr};
+  QSize map_pixmap_size_;
 };
 
 }  // namespace libbot_rviz_plugins
