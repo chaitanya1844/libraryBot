@@ -39,8 +39,24 @@ class FastLIOLocalization(Node):
                 ("fov_far", 300),
                 ("pcd_map_topic", "/map"),
                 ("pcd_map_path", ""),
+                # Guards against the estimate silently "walking away" from
+                # the true pose over many cycles: localisation_timer_callback
+                # feeds each accepted registration's own result back in as
+                # the *next* cycle's seed (self.T_map_to_odom), with
+                # nothing here to stop a single registration that passes
+                # fitness but is still subtly wrong (a real risk in a map
+                # with repetitive geometry, like rows of near-identical
+                # shelves) from compounding indefinitely -- each drifted
+                # step just becomes the new "trusted" baseline for the
+                # next. Reject any update (other than right after a fresh
+                # /initialpose, which is allowed to jump freely -- that's
+                # a deliberate correction, not drift) that moves further
+                # than this per cycle instead.
+                ("max_drift_translation_m", 0.3),
+                ("max_drift_yaw_rad", 0.3),
             ],
         )
+        self._just_reseeded = False
 
         self.tf_buffer = tf2_ros.Buffer()
         self.tf_listener = tf2_ros.TransformListener(self.tf_buffer, self)
@@ -156,10 +172,26 @@ class FastLIOLocalization(Node):
         transformation, fitness = self.registration_at_scale(scan_tobe_mapped, global_map_in_FOV, initial=pose_estimation, scale=1)
         
         if fitness > self.get_parameter("localization_threshold").value:
-            self.T_map_to_odom = transformation
-            self.publish_odom(transformation)
+            if self._just_reseeded or self._is_within_drift_limit(transformation):
+                self.T_map_to_odom = transformation
+                self.publish_odom(transformation)
+                self._just_reseeded = False
+            else:
+                self.get_logger().warn(
+                    "Registration passed fitness but jumped further than "
+                    "the drift guard allows in one cycle -- rejecting to "
+                    "avoid compounding away from the true pose; keeping "
+                    "the current estimate and retrying next cycle.")
         else:
             self.get_logger().warn(f"Fitness score {fitness} less than localization threshold {self.get_parameter('localization_threshold').value}")
+
+    def _is_within_drift_limit(self, new_transform):
+        d_translation = np.linalg.norm(new_transform[:2, 3] - self.T_map_to_odom[:2, 3])
+        d_yaw = abs(tf_transformations.euler_from_matrix(new_transform)[2]
+                     - tf_transformations.euler_from_matrix(self.T_map_to_odom)[2])
+        d_yaw = min(d_yaw, 2 * np.pi - d_yaw)
+        return (d_translation <= self.get_parameter("max_drift_translation_m").value
+                and d_yaw <= self.get_parameter("max_drift_yaw_rad").value)
 
     def voxel_down_sample(self, pcd, voxel_size):
         # print(pcd)
@@ -193,8 +225,9 @@ class FastLIOLocalization(Node):
     def cb_initialize_pose(self, msg):
         initial_pose = self.pose_to_mat(msg.pose.pose)
         self.initialized = True
+        self._just_reseeded = True
         self.get_logger().info("Initial pose received.")
-        
+
         if self.cur_scan is not None:
             self.global_localization(initial_pose)
             
