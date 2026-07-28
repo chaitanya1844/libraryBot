@@ -1,7 +1,7 @@
 # Nav2 stack tuned for libbot: a holonomic (omni/mecanum) base navigating
 # a library floor plan with narrow ~1-1.2m aisles. AMCL and map_server are
 # NOT here -- they're launched/managed separately by
-# libbot_localization/launch/localization.launch.py (use_amcl:=true), which
+# libbot_fastlio/launch/localization.launch.py (use_amcl:=true), which
 # keeps localization independently restartable from the planning/control
 # layer. This file's lifecycle_manager only manages the nodes below.
 
@@ -187,7 +187,7 @@
           # is the lidar/depth-camera fusion for local obstacle
           # avoidance; IMU fusion (for a stable base_footprint pose to
           # actually place these detections correctly) happens upstream
-          # in robot_localization (libbot_localization/config/ekf.yaml),
+          # in robot_localization (libbot_fastlio/config/ekf.yaml),
           # not here.
           observation_sources: scan depth_camera
           scan:

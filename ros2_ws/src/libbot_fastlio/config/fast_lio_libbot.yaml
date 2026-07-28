@@ -16,7 +16,7 @@
         # name (last mapping run wins); run pcd_to_2d_map.py against it
         # and/or copy it elsewhere before starting a new mapping run if
         # you want to keep more than one.
-        map_file_path: "/home/sychic/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+        map_file_path: "/home/sychic/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd"
 
         common:
             lid_topic:  "/libbot/lidar_3d/points_velodyne"

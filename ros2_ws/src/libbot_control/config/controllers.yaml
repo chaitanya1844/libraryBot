@@ -62,7 +62,7 @@
       base_frame_id: base_footprint
       odom_frame_id: odom
       # robot_localization's EKF owns the odom->base_footprint TF (see
-      # libbot_localization/config/ekf.yaml); the controller only publishes
+      # libbot_fastlio/config/ekf.yaml); the controller only publishes
       # the /libbot/mecanum_drive_controller/odometry topic as one of the
       # EKF's two inputs (the other being IMU).
       enable_odom_tf: false

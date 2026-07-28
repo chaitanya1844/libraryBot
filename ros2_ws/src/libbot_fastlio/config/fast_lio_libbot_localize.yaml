@@ -11,7 +11,7 @@
         # map_en is off (see below), just present so /map_save (if ever
         # called by mistake during localization) doesn't crash for
         # missing this parameter.
-        map_file_path: "/home/sychic/libraryBot/ros2_ws/src/libbot_mapping/pcd_maps/latest.pcd"
+        map_file_path: "/home/sychic/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd"
 
         common:
             lid_topic:  "/libbot/lidar_3d/points_velodyne"
