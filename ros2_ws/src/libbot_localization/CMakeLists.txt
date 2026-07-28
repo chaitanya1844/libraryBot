@@ -9,6 +9,7 @@ install(DIRECTORY config launch
 
 install(PROGRAMS
   libbot_localization/fastlio_map_odom_bridge.py
+  libbot_localization/auto_localize.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
