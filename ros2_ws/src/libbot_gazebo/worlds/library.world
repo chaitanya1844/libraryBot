@@ -19,14 +19,6 @@
       <update_rate>20.0</update_rate>
     </plugin>
 
-    <!-- Arm gripper pick/place: welds gripper_link (on the libbot model)
-         to a book model's link on grasp, breaks that joint again on
-         release. See libbot_gazebo_plugins/link_attacher_plugin.cpp. -->
-    <plugin name="libbot_link_attacher" filename="liblibbot_link_attacher.so">
-      <ros>
-        <namespace>/libbot</namespace>
-      </ros>
-    </plugin>
     <gravity>0 0 -9.8</gravity>
     <magnetic_field>6e-06 2.3e-05 -4.2e-05</magnetic_field>
     <atmosphere type="adiabatic" />

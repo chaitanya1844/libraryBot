@@ -10,11 +10,10 @@ one either).
 
 Both are static because the geometry generating them doesn't move
 during normal operation: the mast is a fixed part of the chassis, and
-the arm only leaves its stowed box while libbot_manipulation's task
-manager is actively picking/placing (not while driving between poses).
-If the arm needs to be usable *while* the lidar is actively relied on
-for something (unlikely today), this filter would need to become
-joint-state-aware instead of a fixed box.
+the arm stays stowed while driving. If the arm needs to be usable
+*while* the lidar is actively relied on for something (unlikely
+today), this filter would need to become joint-state-aware instead of
+a fixed box.
 """
 import numpy as np
 import rclpy

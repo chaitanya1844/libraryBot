@@ -11,7 +11,6 @@
 
   <exec_depend>gazebo_ros</exec_depend>
   <exec_depend>gazebo_plugins</exec_depend>
-  <exec_depend>libbot_gazebo_plugins</exec_depend>
   <exec_depend>libbot_description</exec_depend>
   <exec_depend>xacro</exec_depend>
   <exec_depend>robot_state_publisher</exec_depend>

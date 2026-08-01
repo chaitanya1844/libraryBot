@@ -16,24 +16,16 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
-from launch.conditions import IfCondition
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 
 
 def generate_launch_description():
     use_sim_time = LaunchConfiguration('use_sim_time')
-    collect_books = LaunchConfiguration('collect_books')
 
     return LaunchDescription([
         DeclareLaunchArgument('use_sim_time', default_value='true'),
-        # Off by default: the task manager is a NavigateToPose client and
-        # will just fail its first goal if Nav2 isn't localized yet. Bring
-        # this up once (mapping/localization already done, see README
-        # "Map, localize, navigate workflow"):
-        #   ros2 launch libbot_bringup autonomy.launch.py collect_books:=true
-        DeclareLaunchArgument('collect_books', default_value='false'),
 
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(
@@ -41,13 +33,4 @@ def generate_launch_description():
                 'launch', 'navigation.launch.py')),
             launch_arguments={'use_sim_time': use_sim_time}.items(),
         ),
-
-        # Give AMCL/Nav2 a moment to finish activating before the task
-        # manager starts sending NavigateToPose goals.
-        TimerAction(period=8.0, actions=[IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(
-                get_package_share_directory('libbot_manipulation'),
-                'launch', 'manipulation.launch.py')),
-            condition=IfCondition(collect_books),
-        )]),
     ])

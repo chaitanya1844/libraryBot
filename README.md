@@ -1,20 +1,14 @@
 # libraryBot
 
 A ROS 2 Humble + Gazebo Classic 11 simulation of an autonomous library
-robot: a holonomic (mecanum) base with a side-mounted 4-DOF pick/place
-arm, a 3D lidar, an IMU, and a RealSense D435i depth camera, navigating a
-library floor plan (derived from `aws-robomaker-bookstore-world`) with
-Nav2 and picking books up off shelves with the arm.
+robot: a holonomic (mecanum) base with a side-mounted 4-DOF arm, a 3D
+lidar, an IMU, and a RealSense D435i depth camera, navigating a library
+floor plan (derived from `aws-robomaker-bookstore-world`) with Nav2.
 
 ![The robot in the library, arm side-mounted, lidar mast raised](docs/robot_in_library.png)
 
 ## What's simulated vs. simplified
 
-- **Grasping**: no fingers/moving gripper joint. `libbot_gazebo_plugins`'
-  link-attacher plugin teleports a book model onto `gripper_link` each
-  physics step on pick (a physics `fixed` joint between two independent
-  models was unstable -- see git history if you need the details), not a
-  real contact-based grasp.
 - **Drivetrain**: propulsion is `gazebo_ros_planar_move` (sets body
   velocity directly), not wheel-ground friction -- mecanum roller
   friction in Gazebo Classic's ODE was too solver-sensitive to reliably
@@ -28,12 +22,10 @@ Nav2 and picking books up off shelves with the arm.
 ros2_ws/src/
 ├── libbot_description      URDF/xacro: chassis, mecanum wheels, side-mounted arm, 3D lidar, IMU, RealSense D435i, ros2_control
 ├── libbot_gazebo            Library world (from aws-robomaker-bookstore-world), spawn launch, book/shelf props
-├── libbot_gazebo_plugins    Link-attacher Gazebo world plugin (AttachLink/DetachLink services) for pick/place
 ├── libbot_control           mecanum_drive_controller + arm_controller + joint_state_broadcaster (ros2_control) config/launch
-├── libbot_manipulation      book_catalog.yaml, shelf_catalog.yaml, the Nav2+arm task manager (task_manager_node.py)
 ├── libbot_fastlio           EKF + FAST-LIO2 mapping/localization: PCD save, PCD->2D map converter, ICP relocalization against a saved map (vendored from HViktorTsoi/FAST_LIO_LOCALIZATION, see its README.fast_lio_localization.md), all config/launch
 ├── libbot_navigation        Nav2 params (holonomic DWB tuning) + launch + RViz config
-├── libbot_perception        Lidar->2D scan, 3D-lidar-to-Velodyne-format adapter (for FAST-LIO2), self-hit filtering
+├── libbot_perception        Lidar->2D scan, 3D-lidar-to-Livox-format adapter (for FAST-LIO2), self-hit filtering
 ├── libbot_rviz_plugins      Native RViz2 panel (C++/Qt): the primary control surface, embedded in RViz
 └── libbot_bringup           Top-level launch files (simulation.launch.py, autonomy.launch.py, switch_mode.sh)
 ```
@@ -115,17 +107,11 @@ with RViz's "2D Pose Estimate" once localization starts -- same as AMCL,
 ICP needs a real seed to converge to the correct alignment rather than a
 wrong one.
 
-Manipulation (arm pick/place on top of navigation):
-
-```bash
-ros2 launch libbot_bringup autonomy.launch.py collect_books:=true
-```
-
 Kill everything:
 
 ```bash
 pkill -9 -f "ros2 launch"; pkill -9 gzserver; pkill -9 gzclient; pkill -9 rviz2
-pkill -9 -f "robot_state_publisher|ekf_node|teleop_twist_joy|joy_node|lidar_3d_self_filter|pointcloud_to_laserscan|trail_publisher|fastlio_mapping|lidar_3d_velodyne_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node"
+pkill -9 -f "robot_state_publisher|ekf_node|teleop_twist_joy|joy_node|lidar_3d_self_filter|pointcloud_to_laserscan|trail_publisher|fastlio_mapping|lidar_3d_livox_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node"
 ```
 If anything survives (`ps aux | grep <name>`), `kill -9 <pid>` directly --
 pkill's pattern matching occasionally misses.
@@ -151,9 +137,15 @@ cd ~/fastlio_ws && colcon build --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=hum
 ```
 
 Notes if you touch this stack:
-- `libbot_perception/lidar_3d_velodyne_adapter.py` synthesizes the
-  per-point `ring`/`time` fields FAST-LIO2 needs (Gazebo's `ray` sensor
-  captures a whole cloud at one instant, no real per-point time).
+- The simulated 3D lidar approximates a Livox Mid360: `libbot_description/
+  urdf/sensors/lidar_3d.urdf.xacro` publishes a raw `PointCloud2` from
+  Gazebo's `ray` sensor, and `libbot_perception/lidar_3d_livox_adapter.py`
+  repackages it as a `livox_ros_driver2/msg/CustomMsg` on `/livox/lidar`
+  (synthesizing the per-point `line`/`offset_time` fields FAST-LIO2 needs,
+  since Gazebo's `ray` sensor captures a whole cloud at one instant, no
+  real per-point time) -- the same message type/topic name a real
+  Mid360's driver publishes. The IMU is published on `/livox/imu` to
+  match.
 - `fast_lio_libbot.yaml` needs `publish.map_en: true` -- without it,
   `/map_save` crashes the node with an unhandled PCL exception
   ("Input point cloud has no data!") since nothing else ever populates
@@ -186,7 +178,7 @@ Notes if you touch this stack:
 docked in the RViz window `simulation.launch.py` opens. If missing:
 `Panels -> Add New Panel -> libbot_rviz_plugins -> LibbotControlPanel`.
 
-- **Status**: sorting state, live pose.
+- **Status**: live pose.
 - **E-STOP**: toggle -- deactivates `mecanum_drive_controller` via
   `/libbot/controller_manager/switch_controller` so nothing can move the
   base regardless of who's publishing commands. Doesn't cancel an
@@ -219,7 +211,7 @@ same topic Nav2 and the panel use. If not detected: `ls /dev/input/js*`.
 | Chassis/wheel dimensions, mass | `libbot_description/urdf/base/base.urdf.xacro` |
 | Mast height/radius | `libbot_description/urdf/base/payload_platform.urdf.xacro` |
 | Nav2 planning footprint radius | `libbot_navigation/config/nav2_params.yaml` (`robot_radius`) -- must stay >= chassis half-diagonal |
-| 3D lidar channels/rate/range | `libbot_description/urdf/sensors/lidar_3d.urdf.xacro` |
+| 3D lidar (Mid360-approximating) channels/rate/range | `libbot_description/urdf/sensors/lidar_3d.urdf.xacro` |
 | IMU noise | `libbot_description/urdf/sensors/imu.urdf.xacro` |
 | Depth camera resolution/rate/range | `libbot_description/urdf/sensors/depth_camera_gazebo.urdf.xacro` |
 | Mecanum kinematics | `libbot_control/config/controllers.yaml` (`kinematics.*`) |
@@ -228,18 +220,8 @@ same topic Nav2 and the panel use. If not detected: `ls /dev/input/js*`.
 | EKF sensor fusion weights | `libbot_fastlio/config/ekf.yaml` |
 | FAST-LIO2 tuning, map save path | `libbot_fastlio/config/fast_lio_libbot.yaml` |
 | Nav2: velocity/accel limits, critics, costmaps, BT | `libbot_navigation/config/nav2_params.yaml` |
-| Books / approach poses | `libbot_manipulation/config/book_catalog.yaml` -- must match `library.world` |
-| Shelf locations / approach poses | `libbot_manipulation/config/shelf_catalog.yaml` |
 | Arm joint limits/mount, gripper | `libbot_description/urdf/arm/arm.urdf.xacro` |
 | Arm trajectory controller | `libbot_control/config/controllers.yaml` (`arm_controller`) |
-
-### Adding a book/shelf
-
-Book: add a prop `<include>` to `library.world`, then a matching entry
-(same `name`, `pose`, `approach_pose`) to `book_catalog.yaml`.
-Shelf: add an entry to `shelf_catalog.yaml` with `name` (matching
-`library.world`), `pose`, `approach_pose` -- not automatically
-collision-checked against furniture.
 
 ## Troubleshooting
 
@@ -274,14 +256,8 @@ ros2 topic pub /libbot/mecanum_drive_controller/reference_unstamped geometry_msg
 ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
   "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.3, y: 2.8}, orientation: {w: 1.0}}}}"
 
-# Move the arm directly (bypasses the task manager)
+# Move the arm directly
 ros2 action send_goal /libbot/arm_controller/follow_joint_trajectory control_msgs/action/FollowJointTrajectory \
   "{trajectory: {joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_pitch_joint], \
     points: [{positions: [0.3, -0.5, 0.8, 0.2], time_from_start: {sec: 2}}]}}"
-
-# Weld/release a book directly (bypasses the task manager)
-ros2 service call /libbot/attach_link libbot_gazebo_plugins/srv/AttachLink \
-  "{model1_name: libbot, link1_name: gripper_link, model2_name: BookE_01_001, link2_name: link}"
-ros2 service call /libbot/detach_link libbot_gazebo_plugins/srv/DetachLink \
-  "{model1_name: libbot, link1_name: gripper_link, model2_name: BookE_01_001, link2_name: link}"
 ```

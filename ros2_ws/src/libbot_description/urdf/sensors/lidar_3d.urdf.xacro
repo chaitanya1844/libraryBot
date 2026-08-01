@@ -1,17 +1,26 @@
 <?xml version="1.0"?>
 <robot xmlns:xacro="http://www.ros.org/wiki/xacro">
 
-  <!-- Simulated 3D spinning lidar (16-channel, VLP-16 class) built from
-       a Gazebo "ray" sensor with vertical samples. CPU ray (not gpu_ray)
+  <!-- Simulated solid-state lidar approximating a Livox Mid360 (360 deg
+       horizontal FOV, ~59 deg vertical FOV, ~40m range), built from a
+       Gazebo "ray" sensor with vertical samples. CPU ray (not gpu_ray)
        is used because Gazebo 11 gpu_ray does not support multiple
-       vertical rays. Publishes sensor_msgs/PointCloud2 on
-       /libbot/lidar_3d/points; libbot_perception/pointcloud_to_laserscan
-       flattens the mid ring to sensor_msgs/LaserScan on /scan for
-       SLAM Toolbox / Nav2 2D costmaps. -->
+       vertical rays. A real Mid360's non-repetitive rosette scan pattern
+       and lack of fixed rings/channels can't be reproduced by this
+       sensor model: "channels"/"horizontal_samples" here are just a
+       dense row/column grid approximating its point density, and the
+       Gazebo ray sensor's vertical FOV is symmetric about the sensor's
+       horizontal, unlike the Mid360's actual -7/+52 deg split, so
+       vfov_deg is centered (+-29.5 deg) rather than matching that split.
+       Publishes sensor_msgs/PointCloud2 on /libbot/lidar_3d/points;
+       libbot_perception/lidar_3d_livox_adapter.py repackages it as a
+       livox_ros_driver2/msg/CustomMsg on /livox/lidar for FAST-LIO2, and
+       libbot_perception/pointcloud_to_laserscan flattens the mid ring to
+       sensor_msgs/LaserScan on /scan for Nav2's 2D costmaps. -->
 
   <xacro:macro name="libbot_lidar_3d" params="parent xyz:='0 0 0' rpy:='0 0 0'
-                horizontal_samples:=440 channels:=16
-                vfov_deg:=30.0 hz:=10 min_range:=0.12 max_range:=25.0">
+                horizontal_samples:=600 channels:=40
+                vfov_deg:=59.0 hz:=10 min_range:=0.1 max_range:=40.0">
     <link name="lidar_3d_link">
       <visual>
         <geometry><cylinder radius="0.045" length="0.06"/></geometry>

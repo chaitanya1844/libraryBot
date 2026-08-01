@@ -5,10 +5,7 @@ Run once shortly after arm_controller activates (see control.launch.py)
 so the arm never sits at its spawn/zero pose -- with a side-mounted arm,
 all-joints-zero extends the whole arm straight out from the chassis
 (~0.7m), which is both a poor look and made mapping runs harder to
-thread through tight corners/aisles. This is the same pose
-libbot_manipulation/task_manager_node.py returns the arm to between
-pick/place cycles (POSE_STOW here is a plain copy, not imported, since
-this runs standalone before that package is necessarily even relevant).
+thread through tight corners/aisles.
 """
 import rclpy
 from rclpy.action import ActionClient

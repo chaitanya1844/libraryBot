@@ -118,19 +118,6 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
         )]),
 
-        # Live TF + RViz marker for specific tracked item models (books,
-        # etc.) straight from Gazebo ground truth -- see the node's own
-        # docstring. item_names is runtime-settable (`ros2 param set`),
-        # not just this launch-time default, so more items can be added
-        # without a restart.
-        TimerAction(period=6.0, actions=[Node(
-            package='libbot_perception',
-            executable='item_pose_publisher.py',
-            name='item_pose_publisher',
-            output='screen',
-            parameters=[{'use_sim_time': use_sim_time}],
-        )]),
-
         # 5. Localization: EKF always; SLAM (mapping) or AMCL (navigation) exclusively
         _include('libbot_fastlio', 'mapping.launch.py', {'use_sim_time': use_sim_time},
                  condition=IfCondition(is_mapping), delay=11.0),

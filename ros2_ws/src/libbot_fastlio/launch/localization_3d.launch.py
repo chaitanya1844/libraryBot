@@ -2,9 +2,10 @@
 FAST-LIO2 (tightly-coupled LiDAR-inertial odometry, iterated Kalman
 filter + incremental k-d tree -- no factor-graph backend, chosen over
 rtabmap specifically for being light enough to actually run on a Jetson
-Nano Super). This is what /libbot/lidar_3d/points and /libbot/imu/data_raw
-are for -- the rest of the stack only ever flattens the lidar cloud to 2D
-via pointcloud_to_laserscan.
+Nano Super). This is what /libbot/lidar_3d/points (repackaged as
+/livox/lidar by lidar_3d_livox_adapter.py) and /livox/imu are for -- the
+rest of the stack only ever flattens the lidar cloud to 2D via
+pointcloud_to_laserscan.
 
 FAST-LIO2 owns its own odometry (published as /Odometry, frame "camera_init"
 -> "body"), independent of the EKF's "odom" used by the 2D AMCL/Nav2 stack,
@@ -55,15 +56,17 @@ def generate_launch_description():
                                             'when localizing against an already-saved PCD instead '
                                             '-- see localization_fastlio.launch.py.'),
 
-        # Gazebo's ray sensor has no per-point ring/time capture (the
-        # whole cloud arrives at one simulation instant) -- FAST-LIO's
-        # Velodyne point type needs both, synthesized here from each
-        # point's geometry (see the node's own docstring for why this is
-        # safe to fabricate in sim).
+        # Gazebo's ray sensor has no per-point line/time capture (the
+        # whole cloud arrives at one simulation instant) -- the
+        # livox_ros_driver2/msg/CustomMsg format FAST-LIO's Livox point
+        # type needs both, synthesized here from each point's geometry
+        # (see the node's own docstring for why this is safe to
+        # fabricate in sim). Publishes on /livox/lidar, the same topic
+        # a real Mid360's driver uses.
         Node(
             package='libbot_perception',
-            executable='lidar_3d_velodyne_adapter.py',
-            name='lidar_3d_velodyne_adapter',
+            executable='lidar_3d_livox_adapter.py',
+            name='lidar_3d_livox_adapter',
             output='screen',
             parameters=[{
                 'use_sim_time': use_sim_time,

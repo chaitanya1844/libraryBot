@@ -24,11 +24,44 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
+from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, OpaqueFunction
 from launch.conditions import IfCondition
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration
 from launch_ros.actions import Node
+
+
+def _include_localization_fastlio(context, use_sim_time, use_amcl, map_yaml, pkg_share):
+    # Named PCD matching the map's own basename (pcd_to_2d_map.py copies the
+    # source PCD there under that name at save time) -- NOT always
+    # pcd_maps/latest.pcd regardless of which map was actually selected: that
+    # earlier behavior silently paired a newer/different mapping session's
+    # point cloud with an older selected map (see switch_mode.sh, which has
+    # the same fallback logic for its own launch path). Falls back to
+    # latest.pcd only if no matching named PCD exists yet.
+    # Source-tree path (not pkg_share/install) -- pcd_maps are large,
+    # machine/run-specific files maintained in place, same convention
+    # localization_fastlio.launch.py and switch_mode.sh already use.
+    pcd_maps_dir = os.path.expanduser(
+        '~/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps')
+    map_yaml_path = map_yaml.perform(context)
+    map_basename = os.path.splitext(os.path.basename(map_yaml_path))[0]
+    named_pcd_path = os.path.join(pcd_maps_dir, f'{map_basename}.pcd')
+    if os.path.isfile(named_pcd_path):
+        pcd_map_path = named_pcd_path
+    else:
+        pcd_map_path = os.path.join(pcd_maps_dir, 'latest.pcd')
+
+    return [IncludeLaunchDescription(
+        PythonLaunchDescriptionSource(os.path.join(
+            pkg_share, 'launch', 'localization_fastlio.launch.py')),
+        launch_arguments={
+            'use_sim_time': use_sim_time,
+            'map': map_yaml,
+            'pcd_map_path': pcd_map_path,
+        }.items(),
+        condition=IfCondition(use_amcl),
+    )]
 
 
 def generate_launch_description():
@@ -57,10 +90,6 @@ def generate_launch_description():
             parameters=[ekf_config, {'use_sim_time': use_sim_time}],
         ),
 
-        IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(os.path.join(
-                pkg_share, 'launch', 'localization_fastlio.launch.py')),
-            launch_arguments={'use_sim_time': use_sim_time, 'map': map_yaml}.items(),
-            condition=IfCondition(use_amcl),
-        ),
+        OpaqueFunction(function=lambda context: _include_localization_fastlio(
+            context, use_sim_time, use_amcl, map_yaml, pkg_share)),
     ])

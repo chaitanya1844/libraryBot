@@ -15,7 +15,6 @@
   <exec_depend>libbot_fastlio</exec_depend>
   <exec_depend>libbot_navigation</exec_depend>
   <exec_depend>libbot_perception</exec_depend>
-  <exec_depend>libbot_manipulation</exec_depend>
   <exec_depend>rviz2</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>

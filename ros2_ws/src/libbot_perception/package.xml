@@ -20,6 +20,10 @@
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>gazebo_msgs</exec_depend>
   <exec_depend>tf2_ros</exec_depend>
+  <!-- Not available via apt/rosdep: built from source in the
+       ~/fastlio_ws overlay (see README "3D mapping/localization"),
+       which must be sourced before this package's own build. -->
+  <exec_depend>livox_ros_driver2</exec_depend>
   <exec_depend>python3-numpy</exec_depend>
   <exec_depend>python3-scipy</exec_depend>
 

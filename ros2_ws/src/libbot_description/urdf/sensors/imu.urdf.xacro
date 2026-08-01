@@ -38,8 +38,15 @@
         </imu>
         <plugin name="libbot_imu_plugin" filename="libgazebo_ros_imu_sensor.so">
           <ros>
-            <namespace>/libbot</namespace>
-            <remapping>~/out:=imu/data_raw</remapping>
+            <!-- No namespace (unlike the other libbot sensor plugins):
+                 published as /livox/imu, the same global
+                 (non-namespaced) topic name a real Mid360's built-in
+                 IMU is published on by livox_ros_driver2. A leading-
+                 slash absolute remap under an explicit namespace tag
+                 wasn't honored by this plugin in testing; dropping
+                 the namespace and using a plain relative remap is what
+                 actually produces /livox/imu. -->
+            <remapping>~/out:=livox/imu</remapping>
           </ros>
           <frame_name>imu_link</frame_name>
           <initial_orientation_as_reference>false</initial_orientation_as_reference>
