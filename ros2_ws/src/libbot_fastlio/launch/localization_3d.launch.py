@@ -57,12 +57,14 @@ def generate_launch_description():
                                             '-- see localization_fastlio.launch.py.'),
 
         # Gazebo's ray sensor has no per-point line/time capture (the
-        # whole cloud arrives at one simulation instant) -- the
+        # whole cloud arrives at one simulation instant), but the
         # livox_ros_driver2/msg/CustomMsg format FAST-LIO's Livox point
-        # type needs both, synthesized here from each point's geometry
-        # (see the node's own docstring for why this is safe to
-        # fabricate in sim). Publishes on /livox/lidar, the same topic
-        # a real Mid360's driver uses.
+        # type needs both. `line` is bucketed from each point's vertical
+        # angle; `offset_time` is left at zero rather than faked, since
+        # FAST-LIO2 de-skews with it and there is no real skew here (see
+        # the node's own docstring -- a correctness fix, measurably not
+        # a drift fix). Publishes on /livox/lidar, the same topic a real
+        # Mid360's driver uses.
         Node(
             package='libbot_perception',
             executable='lidar_3d_livox_adapter.py',
