@@ -546,13 +546,13 @@ Visualization Manager:
     - Alpha: 1
       Buffer Length: 1
       Class: rviz_default_plugins/Path
-      Color: 12; 227; 14
+      Color: 0; 255; 0
       Enabled: true
       Head Diameter: 0.30000001192092896
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
       Line Style: Lines
-      Line Width: 0.03999999910593033
+      Line Width: 0.07000000000000001
       Name: GlobalPlan
       Offset:
         X: 0

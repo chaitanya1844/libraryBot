@@ -13,8 +13,12 @@ floor plan (derived from `aws-robomaker-bookstore-world`) with Nav2.
   velocity directly), not wheel-ground friction -- mecanum roller
   friction in Gazebo Classic's ODE was too solver-sensitive to reliably
   convert wheel spin into chassis motion. Wheels still spin visually.
-- **No bundled map**: build one yourself (see Workflow below) before
-  sending Nav2 goals.
+- **Bundled map**: `libbot_fastlio/maps/library.yaml` (paired with
+  `pcd_maps/library.pcd`) covers the west half of the floor -- enough to
+  localize and send Nav2 goals immediately. Capture your own for the rest
+  (see Commands below); a good map has single-line walls, so if yours
+  shows the same wall drawn at several angles, something upstream of
+  FAST-LIO2 is feeding it inconsistent scans.
 
 ## Repository layout
 
@@ -225,9 +229,15 @@ same topic Nav2 and the panel use. If not detected: `ls /dev/input/js*`.
 
 ## Troubleshooting
 
-**"Failed to bring up all requested nodes"** -- `nav2_lifecycle_manager`
-startup race under load, not a config error. Just re-run the command;
-check `free -h` if it keeps happening.
+**"Failed to bring up all requested nodes"** -- usually
+`nav2_lifecycle_manager` losing a startup race under load, not a config
+error. Re-running the command is safe (`switch_mode.sh navigation` stops
+Nav2's own nodes first); check `free -h` if it keeps happening.
+
+If it happens *every* time rather than intermittently, check for a
+second Nav2 stack instead: `ps aux | grep controller_server` should
+show exactly one. Two lifecycle managers racing to manage the same node
+names fail this way permanently, not intermittently.
 
 **Robot stops responding after a lot of manual testing** -- check
 `free -h`; stray processes from repeated `ros2 launch` Ctrl-C's add up.

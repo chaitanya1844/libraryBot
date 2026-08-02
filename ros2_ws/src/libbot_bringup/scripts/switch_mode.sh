@@ -37,6 +37,13 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_fastlio/maps/library.yaml}"
 # stale process serving genuinely stale data.
 STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|lidar_3d_livox_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|pcd_to_pointcloud|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
 
+# Just the Nav2 half, for relaunching navigation without tearing down
+# the localization stage underneath it (which owns map->odom and would
+# have to re-seed its ICP if restarted). Deliberately excludes
+# lifecycle_manager, whose name is shared with the localization stage's
+# own manager -- autonomy.launch.py's copy dies with the launch parent.
+NAV_STOP_PATTERN="controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|autonomy.launch.py"
+
 # FAST-LIO2 replaced AMCL as the localization source (see
 # libbot_fastlio/launch/localization_fastlio.launch.py) -- it lives
 # in a separate ~/fastlio_ws overlay workspace since it isn't packaged
@@ -54,16 +61,17 @@ stop_stack() {
   # how "I saved a brand new map but it still shows the old one" kept
   # happening even when the newly-saved files themselves were correct.
   # Loop kill+verify a few times instead of trusting one shot.
+  local pattern="${1:-$STOP_PATTERN}"
   for _ in 1 2 3 4 5; do
-    if ! pgrep -f "$STOP_PATTERN" >/dev/null 2>&1; then
+    if ! pgrep -f "$pattern" >/dev/null 2>&1; then
       break
     fi
-    pkill -9 -f "$STOP_PATTERN" 2>/dev/null || true
+    pkill -9 -f "$pattern" 2>/dev/null || true
     sleep 1
   done
-  if pgrep -f "$STOP_PATTERN" >/dev/null 2>&1; then
+  if pgrep -f "$pattern" >/dev/null 2>&1; then
     echo "switch_mode.sh: WARNING -- some matching processes survived stop_stack:" >&2
-    pgrep -af "$STOP_PATTERN" >&2 || true
+    pgrep -af "$pattern" >&2 || true
   fi
 }
 
@@ -125,9 +133,17 @@ case "$MODE" in
       "map:=${MAP_PATH}" "pcd_map_path:=${PCD_PATH}" &
     ;;
   navigation)
-    # Additive on top of an already-running localization stage -- does
-    # not stop anything, since Nav2 needs AMCL's map->odom to already
-    # be flowing.
+    # Additive on top of an already-running localization stage, which
+    # owns map->odom and must keep running -- so this stops only Nav2's
+    # own nodes, not the whole stack.
+    #
+    # It does have to stop those. Without it a second invocation leaves
+    # two full Nav2 stacks up, two lifecycle managers racing to manage
+    # the same node names, and bringup fails with "Failed to change
+    # state for node". That failure reads as the transient startup race
+    # the README describes, so the natural response is to re-run the
+    # command -- which adds a third stack and makes it permanent.
+    stop_stack "$NAV_STOP_PATTERN"
     ros2 launch libbot_bringup autonomy.launch.py &
     ;;
   stop)

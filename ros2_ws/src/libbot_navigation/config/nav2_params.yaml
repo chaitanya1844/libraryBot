@@ -138,19 +138,25 @@
         trans_stopped_velocity: 0.1
         short_circuit_trajectory_evaluation: True
         stateful: True
-        # RotateToGoal removed: it's a non-holonomic critic (rotate to
-        # face the path before allowing any translation), and even at a
-        # low scale it was locking the robot into a self-reinforcing
-        # rotate-only loop from a stop -- "stopped" (low velocity) biased
-        # trajectory generation toward rotation-only samples, which then
-        # never accumulate enough velocity to leave the "stopped" state,
-        # repeating forever. Measured live: identical tiny angular.z
-        # (-0.0316, one of vtheta_samples' smallest non-zero increments)
-        # commanded indefinitely, zero linear velocity, goal accepted but
-        # robot never actually moving. A holonomic (mecanum) base doesn't
-        # need to face its direction of travel at all -- GoalAlign/PathAlign
-        # already handle final orientation without this failure mode.
-        critics: ["Oscillation", "BaseObstacle", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+        # RotateToGoal is what turns the robot to the goal's *orientation*
+        # once it is inside xy_goal_tolerance. It is required, not
+        # optional: GoalAlign scores heading toward the goal *position*,
+        # so once the robot is standing on that position GoalAlign's
+        # gradient is degenerate and nothing in the critic set scores
+        # final yaw at all. Without it the robot parks on the goal and
+        # emits the smallest non-zero vtheta sample (0.0316 rad/s)
+        # forever -- ~60s to cover a 1.9 rad heading error, which
+        # outlives progress_checker's 25s movement_time_allowance, so
+        # every goal aborts with "Failed to make progress" having
+        # physically arrived within 3cm.
+        #
+        # This critic was previously removed after that same 0.0316 rad/s
+        # stall was blamed on it. It was not the cause: the stall is what
+        # its absence looks like.
+        critics: ["Oscillation", "BaseObstacle", "RotateToGoal", "GoalAlign", "PathAlign", "PathDist", "GoalDist"]
+        RotateToGoal.scale: 32.0
+        RotateToGoal.slowing_factor: 5.0
+        RotateToGoal.lookahead_time: -1.0
         BaseObstacle.scale: 0.02
         PathAlign.scale: 24.0
         GoalAlign.scale: 20.0
