@@ -273,6 +273,7 @@ void LibbotControlPanel::onInitialize()
     node_, "/navigate_to_pose");
 
   map_save_client_ = node_->create_client<std_srvs::srv::Trigger>("/map_save");
+  colored_map_save_client_ = node_->create_client<std_srvs::srv::Trigger>("/colored_map_save");
 
   set_entity_state_client_ = node_->create_client<gazebo_msgs::srv::SetEntityState>(
     "/libbot/set_entity_state");
@@ -772,6 +773,38 @@ void LibbotControlPanel::onSaveMap()
 
   pending_map_name_ = name;
   setSavingUi(true, "Saving 3D map...");
+
+  // Fire-and-forget alongside the geometry save below: the colorizer
+  // (lidar_camera_colorizer.py) keeps its own running accumulation
+  // regardless of this button, this just asks it to flush what it has
+  // to disk now and copies the result under the same name as the
+  // geometry map so the two stay paired the same way pcd_to_2d_map.py
+  // already pairs a named .pcd with its .yaml. Best-effort only --
+  // colorizer isn't running outside mapping/localization mode, and a
+  // failure here shouldn't block the actual (geometry) map save.
+  if (colored_map_save_client_->service_is_ready()) {
+    auto colored_req = std::make_shared<std_srvs::srv::Trigger::Request>();
+    QString colored_name = name;
+    colored_map_save_client_->async_send_request(
+      colored_req, [this, colored_name](rclcpp::Client<std_srvs::srv::Trigger>::SharedFuture future) {
+        auto resp = future.get();
+        QMetaObject::invokeMethod(this, [this, resp, colored_name]() {
+          if (!resp->success) {
+            log("Colored map save skipped: " + QString::fromStdString(resp->message));
+            return;
+          }
+          QString src = QDir::homePath() +
+            "/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest_colored.pcd";
+          QString dst = pcdMapsDir() + "/" + colored_name + "_colored.pcd";
+          QFile::remove(dst);
+          if (QFile::copy(src, dst)) {
+            log("Colored map saved: " + colored_name + "_colored.pcd");
+          } else {
+            log("Colored map save: could not copy " + src + " to " + dst);
+          }
+        });
+      });
+  }
 
   if (!map_save_client_->service_is_ready()) {
     setSavingUi(false, "Save failed: /map_save service not available (is mapping running?)");

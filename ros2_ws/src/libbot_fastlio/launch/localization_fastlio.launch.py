@@ -112,6 +112,19 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time, 'use_external_localization': True}],
         ),
 
+        # Same live color-painted cloud as mapping.launch.py -- FAST-LIO2
+        # still publishes /cloud_registered during localization (it's
+        # just localizing against a fixed prior map, not saving a new
+        # one), so this keeps building a colored view of wherever the
+        # robot drives during nav/demo too.
+        Node(
+            package='libbot_perception',
+            executable='lidar_camera_colorizer.py',
+            name='lidar_camera_colorizer',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+
         # Static visualization of the actual PCD being localized against
         # (RViz's FastLioCloud display) -- with map_en off (see above)
         # there's otherwise nothing at all shown in 3D for "the map"

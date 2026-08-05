@@ -105,6 +105,18 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time, 'input_topic': '/Laser_map_mapping'}],
         ),
 
+        # Paints the accumulating FAST-LIO2 map with color sampled from
+        # the D435i's RGB image -- see lidar_camera_colorizer.py's own
+        # docstring. Purely cosmetic/for-RViz, doesn't touch the
+        # geometry-only map FAST-LIO2 itself saves via /map_save.
+        Node(
+            package='libbot_perception',
+            executable='lidar_camera_colorizer.py',
+            name='lidar_camera_colorizer',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+
         SetRemap(src='/Laser_map', dst='/Laser_map_mapping'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(

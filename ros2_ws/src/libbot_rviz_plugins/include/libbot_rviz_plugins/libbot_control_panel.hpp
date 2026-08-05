@@ -96,6 +96,7 @@ private:
   rclcpp::Client<controller_manager_msgs::srv::SwitchController>::SharedPtr switch_controller_client_;
   rclcpp_action::Client<nav2_msgs::action::NavigateToPose>::SharedPtr nav_action_client_;
   rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr map_save_client_;
+  rclcpp::Client<std_srvs::srv::Trigger>::SharedPtr colored_map_save_client_;
   rclcpp::Client<gazebo_msgs::srv::SetEntityState>::SharedPtr set_entity_state_client_;
   rclcpp_action::Client<control_msgs::action::FollowJointTrajectory>::SharedPtr arm_action_client_;
 
