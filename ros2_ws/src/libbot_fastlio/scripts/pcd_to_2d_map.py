@@ -29,6 +29,7 @@ import shutil
 import numpy as np
 import open3d as o3d
 import yaml
+from scipy import ndimage
 
 
 def main():
@@ -52,6 +53,12 @@ def main():
                          help='meters above the PCD origin to stop including points (skip the ceiling)')
     parser.add_argument('--occupied-min-points', type=int, default=2,
                          help='points a cell needs before it counts as occupied (denoising)')
+    parser.add_argument('--min-blob-cells', type=int, default=4,
+                         help='occupied cells must belong to an 8-connected blob at least this '
+                              'big to survive -- real walls/shelves are long connected runs of '
+                              'occupied cells, so this drops small speckle (a handful of isolated '
+                              'or near-isolated cells, e.g. from ICP jitter during mapping) without '
+                              'touching actual structure. Set to 1 to disable.')
     parser.add_argument('--padding-m', type=float, default=1.0,
                          help='free-space margin added around the point cloud\'s own extent')
     args = parser.parse_args()
@@ -82,12 +89,33 @@ def main():
     row = ((band[:, 1] - y_min) / args.resolution).astype(np.int32)
     counts = np.zeros((height, width), dtype=np.int32)
     np.add.at(counts, (row, col), 1)
+    occupied = counts >= args.occupied_min_points
+
+    # Drops small speckle that occupied-min-points alone doesn't catch:
+    # a spurious point hit repeatedly (e.g. ICP jitter during a slow pass,
+    # or a transient misregistration) clears occupied_min_points just
+    # fine since it's the same handful of cells lit up over and over, but
+    # it's still only a few isolated/near-isolated cells, not a wall --
+    # real walls/shelves are long connected runs. Label 8-connected
+    # occupied blobs and drop any smaller than min_blob_cells. This is
+    # exactly the failure mode that pinned a robot's own spawn cell as
+    # unplannable once: a few-cell noise blob landed almost on top of it,
+    # inflation marked the start pose lethal, and every plan request
+    # failed before the robot could move at all.
+    if args.min_blob_cells > 1 and occupied.any():
+        labels, num = ndimage.label(occupied, structure=np.ones((3, 3)))
+        sizes = ndimage.sum(occupied, labels, index=np.arange(1, num + 1))
+        small = np.where(sizes < args.min_blob_cells)[0] + 1
+        if len(small) > 0:
+            occupied[np.isin(labels, small)] = False
+            print(f'Dropped {len(small)} speckle blob(s) smaller than '
+                  f'{args.min_blob_cells} cells ({int(sum(sizes[small - 1]))} cells total)')
 
     # pgm convention: 254 = free, 0 = occupied, row 0 is the image's
     # *bottom* in ROS map_server's y-up world -- pgm itself stores
     # top-to-bottom, so flip vertically on write.
     grid = np.full((height, width), 254, dtype=np.uint8)
-    grid[counts >= args.occupied_min_points] = 0
+    grid[occupied] = 0
     grid = np.flipud(grid)
 
     os.makedirs(args.output_dir, exist_ok=True)
