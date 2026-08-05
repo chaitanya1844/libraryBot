@@ -34,7 +34,6 @@ more shelf-top than floor coverage).
 """
 import argparse
 import os
-import shutil
 
 import numpy as np
 import open3d as o3d
@@ -173,9 +172,29 @@ def main():
 
     os.makedirs(args.pcd_output_dir, exist_ok=True)
     named_pcd_path = os.path.join(args.pcd_output_dir, args.output_name + '.pcd')
-    if os.path.abspath(named_pcd_path) != os.path.abspath(args.pcd_path):
-        shutil.copyfile(args.pcd_path, named_pcd_path)
-        print(f'Copied source PCD to {named_pcd_path} (permanently paired with this map name)')
+    # Re-zeroed on Z (shifted by -floor_z), not a verbatim copy: the 2D
+    # map above always renders at z=0 in the map frame (nav2_map_server
+    # hardcodes that -- the yaml's 3rd "origin" number is yaw, not z,
+    # there's no way to give the grid its own height), and
+    # fastlio_map_odom_bridge separately anchors live map-frame Z to
+    # roughly "current ground" during localization. Saving this PCD with
+    # its own raw z=0 (wherever FAST-LIO2 happened to initialize, not the
+    # floor) left it floating below both of those by the same ~0.75m the
+    # z-band fix above already found -- the static reference cloud (and
+    # anything ICP-matched against it) visibly sitting under the flat 2D
+    # map/floor plane instead of on it. Shifting by floor_z here costs
+    # ICP nothing: it only matches shapes, and this file's absolute Z
+    # was already untrusted/unused for the live map->odom Z (see that
+    # file's own docstring).
+    if os.path.abspath(named_pcd_path) == os.path.abspath(args.pcd_path):
+        pts[:, 2] -= floor_z
+        cloud.points = o3d.utility.Vector3dVector(pts)
+        o3d.io.write_point_cloud(named_pcd_path, cloud)
+    else:
+        cloud.points = o3d.utility.Vector3dVector(pts - np.array([0.0, 0.0, floor_z]))
+        o3d.io.write_point_cloud(named_pcd_path, cloud)
+    print(f'Wrote z-zeroed source PCD (floor now at z=0) to {named_pcd_path} '
+          '(permanently paired with this map name)')
 
 
 if __name__ == '__main__':
