@@ -97,16 +97,21 @@ def generate_launch_description():
         # holds the actual color scheme/style choice already set up
         # separately; QT_QPA_PLATFORMTHEME=qt5ct is what makes Qt apps
         # read it instead of falling back to a native/default theme that
-        # ignores it. QT_STYLE_OVERRIDE picks the specific dark widget
-        # style on top of that.
+        # ignores it.
+        #
+        # QT_STYLE_OVERRIDE='HighContrastInverse' and QT_SCALE_FACTOR=1.3
+        # were tried here too (style for the dark look, scale factor for
+        # bigger buttons/text) and both reverted: forcing a non-default
+        # Qt style onto Gazebo Classic's own, notably more fragile,
+        # OpenGL-embedded Qt GUI caused visible glitching/flicker, and
+        # QT_SCALE_FACTOR scales Qt's logical widget coordinates without
+        # necessarily keeping RViz's Ogre viewport's mouse-to-3D-ray
+        # projection in sync with it -- confirmed live as "2D Pose
+        # Estimate" clicks landing somewhere other than where the cursor
+        # actually was. Not safe defaults for this stack; qt5ct's own
+        # theme (read via QT_QPA_PLATFORMTHEME alone, no forced style/
+        # scale) is the dark-mode lever that doesn't touch either.
         SetEnvironmentVariable('QT_QPA_PLATFORMTHEME', 'qt5ct'),
-        SetEnvironmentVariable('QT_STYLE_OVERRIDE', 'HighContrastInverse'),
-        # RViz's own panel buttons/text were reported hard to see/click at
-        # this screen's actual DPI -- QT_SCALE_FACTOR scales the whole Qt
-        # UI (fonts, buttons, spacing) uniformly, cheaper and more
-        # reliable than hunting down every hardcoded widget size in
-        # libbot_control_panel.cpp.
-        SetEnvironmentVariable('QT_SCALE_FACTOR', '1.3'),
 
         # `ros2 launch` sends SIGINT to each process it started, but
         # gzserver in particular has a long track record of surviving
