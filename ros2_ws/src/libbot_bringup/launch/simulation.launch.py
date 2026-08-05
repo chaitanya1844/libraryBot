@@ -33,8 +33,10 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription, TimerAction
+from launch.actions import (DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
+                             RegisterEventHandler, SetEnvironmentVariable, TimerAction)
 from launch.conditions import IfCondition
+from launch.event_handlers import OnShutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -89,6 +91,33 @@ def generate_launch_description():
                                description='Start Xbox controller teleop automatically. '
                                             'Harmless with no controller plugged in -- '
                                             'joy_node just logs that it found no device.'),
+
+        # Dark theme for every Qt5 GUI this launch starts (RViz, Gazebo's
+        # gzclient) -- qt5ct's own config (~/.config/qt5ct/qt5ct.conf)
+        # holds the actual color scheme/style choice already set up
+        # separately; QT_QPA_PLATFORMTHEME=qt5ct is what makes Qt apps
+        # read it instead of falling back to a native/default theme that
+        # ignores it. QT_STYLE_OVERRIDE picks the specific dark widget
+        # style on top of that.
+        SetEnvironmentVariable('QT_QPA_PLATFORMTHEME', 'qt5ct'),
+        SetEnvironmentVariable('QT_STYLE_OVERRIDE', 'HighContrastInverse'),
+
+        # `ros2 launch` sends SIGINT to each process it started, but
+        # gzserver in particular has a long track record of surviving
+        # that (forks/execs internally in a way that doesn't propagate
+        # cleanly) -- confirmed on this machine: closing RViz/gzclient
+        # left a `gzserver` process running for over an hour, still
+        # fully alive and still serving the *same* stale world/robot
+        # state to whatever connected next. That's the "starts from
+        # saved data on next launch" symptom: it isn't loading saved
+        # data at all, it's just reconnecting a fresh GUI to a gzserver
+        # that never actually stopped. Force-kill the whole process
+        # group by name on shutdown so the next `ros2 launch` always
+        # starts genuinely fresh, regardless of whether SIGINT alone
+        # was enough this time.
+        RegisterEventHandler(OnShutdown(on_shutdown=[
+            ExecuteProcess(cmd=['pkill', '-9', '-f', 'gzserver|gzclient|rviz2']),
+        ])),
 
         # 1. Gazebo world
         _include('libbot_gazebo', 'gazebo.launch.py', {

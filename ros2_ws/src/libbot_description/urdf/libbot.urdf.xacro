@@ -44,7 +44,17 @@
        kept unchanged, only x shifted slightly forward per request, with
        the riser above now visually connecting it to the puck instead of
        leaving a bare gap. -->
-  <xacro:libbot_lidar_3d parent="sensor_mast_link" xyz="0.04 0 ${mast_height/2 + 0.15}" hz="5"/>
+  <!-- horizontal_samples/channels trimmed from the macro's defaults
+       (600/40 -> 400/28, ~47% fewer points/scan): measured this sim
+       running well below its own configured 5Hz on this machine
+       (gzserver alone pinned over 1 CPU core, actual scan rate ~3.3Hz).
+       Gazebo's CPU ray sensor cost scales with point count, and nav2's
+       costmap/FAST-LIO2's own voxel-downsampled registration don't need
+       anywhere near the full density this was generating. Still full
+       360deg coverage at a vertical resolution well above what's needed
+       to catch shelf-height obstacles. -->
+  <xacro:libbot_lidar_3d parent="sensor_mast_link" xyz="0.04 0 ${mast_height/2 + 0.15}" hz="5"
+                          horizontal_samples="400" channels="28"/>
 
   <!-- RealSense D435i mounted forward-facing on the chassis's upper
        front face at roughly mid-shelf height, angled down slightly to
@@ -54,7 +64,16 @@
   <xacro:sensor_d435i parent="base_link" name="camera" use_nominal_extrinsics="true">
     <origin xyz="${chassis_x/2 + 0.015} 0 ${chassis_z*0.30}" rpy="0 0.20 0"/>
   </xacro:sensor_d435i>
-  <xacro:libbot_depth_camera_gazebo camera_name="camera"/>
+  <!-- Trimmed from the macro's 640x480@15hz default (307,200 points/frame,
+       4.6M pts/sec): the local costmap only needs enough resolution to
+       catch obstacles at 5cm-ish granularity within a few meters, and
+       colorization (lidar_camera_colorizer.py) reads the separate
+       image_raw/camera_info topics, not this point count, so it's
+       unaffected by shrinking it. Was a large, measurable share of both
+       Gazebo's own per-frame render/sensor cost and every downstream
+       consumer's (costmap, RViz) point-processing cost for resolution
+       nothing here actually uses. -->
+  <xacro:libbot_depth_camera_gazebo camera_name="camera" width="320" height="240" hz="10"/>
 
   <xacro:if value="$(arg use_gazebo)">
     <xacro:include filename="$(find libbot_description)/urdf/control/ros2_control.urdf.xacro"/>

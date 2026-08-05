@@ -53,9 +53,19 @@ class Lidar3DLivoxAdapter(Node):
         self.declare_parameter('vfov_deg', 59.0)
         self.declare_parameter('input_topic', '/libbot/lidar_3d/points')
         self.declare_parameter('output_topic', '/livox/lidar')
+        # Keeps 1 point in every `point_stride` before building the
+        # CustomMsg -- see _on_cloud for why this matters more than it
+        # sounds like it should. Only thins what FAST-LIO2 ingests here;
+        # /libbot/lidar_3d/points itself (costmap obstacle layer, self
+        # filter, the colorizer) is untouched, still full resolution.
+        # FAST-LIO2 voxel-downsamples its own input anyway, so handing it
+        # an already-thinned but still uniformly-covering cloud costs it
+        # nothing in practice.
+        self.declare_parameter('point_stride', 3)
 
         self._channels = self.get_parameter('channels').value
         self._half_vfov = math.radians(self.get_parameter('vfov_deg').value) / 2.0
+        self._stride = max(int(self.get_parameter('point_stride').value), 1)
 
         self._pub = self.create_publisher(
             CustomMsg, self.get_parameter('output_topic').value, 10)
@@ -67,6 +77,8 @@ class Lidar3DLivoxAdapter(Node):
             msg, field_names=('x', 'y', 'z', 'intensity'), skip_nans=True)
         if points.shape[0] == 0:
             return
+        if self._stride > 1:
+            points = points[::self._stride]
 
         x, y, z, intensity = points[:, 0], points[:, 1], points[:, 2], points[:, 3]
 
@@ -85,15 +97,20 @@ class Lidar3DLivoxAdapter(Node):
         out.timebase = (msg.header.stamp.sec * 10**9) + msg.header.stamp.nanosec
         out.point_num = x.shape[0]
         out.lidar_id = 0
+        # Building one CustomPoint object per point is unavoidable (each
+        # is its own ROS message, serialized individually) but repeated
+        # numpy scalar indexing (x[i], y[i], ...) inside the loop was
+        # measured as a real, significant CPU cost on this machine --
+        # ~24,000 points/scan, every scan -- each numpy element access
+        # carries far more overhead than a plain Python float. Bulk
+        # .tolist() once outside the loop, then iterate plain Python
+        # lists with zip: same per-point object construction, far
+        # cheaper per-element access getting there.
+        xs, ys, zs = x.tolist(), y.tolist(), z.tolist()
+        lines, refls = line.tolist(), reflectivity.tolist()
         out.points = [
-            CustomPoint(
-                offset_time=0,
-                x=float(x[i]), y=float(y[i]), z=float(z[i]),
-                reflectivity=int(reflectivity[i]),
-                tag=0,
-                line=int(line[i]),
-            )
-            for i in range(x.shape[0])
+            CustomPoint(offset_time=0, x=px, y=py, z=pz, reflectivity=pr, tag=0, line=pl)
+            for px, py, pz, pr, pl in zip(xs, ys, zs, refls, lines)
         ]
         self._pub.publish(out)
 
