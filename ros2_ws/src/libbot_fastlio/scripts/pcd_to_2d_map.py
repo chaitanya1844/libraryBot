@@ -15,12 +15,22 @@ and "never actually seen".
     python3 pcd_to_2d_map.py map.pcd output_name --resolution 0.05 \\
         --z-min 0.05 --z-max 0.9
 
-z-min/z-max are relative to the PCD's own z=0, which is wherever
-FAST-LIO2 happened to initialize (the lidar's height at that moment, see
-fast_lio_map_odom_bridge.py) -- not the floor. Check the point cloud's
-actual z-range first (this script prints it) and adjust z-min/z-max to
-land on wall/shelf height, not the floor or ceiling, if the defaults cut
-out real obstacles or let the floor itself show up as clutter.
+z-min/z-max are meters above the FLOOR, not the PCD's own z=0 -- that
+origin is wherever FAST-LIO2 happened to initialize (the lidar's height
+at that moment, see fastlio_map_odom_bridge.py), which is a different,
+essentially arbitrary height every mapping session (different spawn
+pose, different start-of-mapping pose) and was previously off by however
+tall the robot's sensor mast is (measured ~0.75m on this robot -- a
+whole map's worth of "z offset" between what z-min/z-max=[0.05, 0.9]
+actually selected and the wall/shelf band the docstring meant, silently
+different per map depending only on where mapping happened to start).
+The floor is instead auto-detected as the single largest near-horizontal
+cluster of points in the cloud's lower half (an indoor floor is normally
+*by far* the biggest flat surface any lidar sees -- confirmed on this
+robot's own maps: 3-5x the point count of the next largest band) and
+z-min/z-max are applied relative to that. Override with --floor-z if a
+particular map's real floor isn't the largest cluster (e.g. a scene with
+more shelf-top than floor coverage).
 """
 import argparse
 import os
@@ -48,9 +58,12 @@ def main():
              'confidently aligns against geometry from a different session).')
     parser.add_argument('--resolution', type=float, default=0.05, help='meters/pixel')
     parser.add_argument('--z-min', type=float, default=0.05,
-                         help='meters above the PCD origin to start including points (skip the floor)')
+                         help='meters above the detected floor to start including points (skip the floor itself)')
     parser.add_argument('--z-max', type=float, default=0.9,
-                         help='meters above the PCD origin to stop including points (skip the ceiling)')
+                         help='meters above the detected floor to stop including points (skip the ceiling)')
+    parser.add_argument('--floor-z', type=float, default=None,
+                         help='override auto-detected floor height (PCD\'s own z units) -- use if the '
+                              'largest flat surface in this particular map isn\'t actually the floor')
     parser.add_argument('--occupied-min-points', type=int, default=2,
                          help='points a cell needs before it counts as occupied (denoising)')
     parser.add_argument('--min-blob-cells', type=int, default=4,
@@ -69,10 +82,29 @@ def main():
         raise SystemExit(f'{args.pcd_path} has no points -- was FAST-LIO2 stopped with '
                           'SIGINT (Ctrl-C), not kill -9? PCDWriter only saves on clean shutdown.')
 
-    print(f'Loaded {len(pts)} points. z range: [{pts[:, 2].min():.2f}, {pts[:, 2].max():.2f}]')
+    z_lo, z_hi = pts[:, 2].min(), pts[:, 2].max()
+    print(f'Loaded {len(pts)} points. z range: [{z_lo:.2f}, {z_hi:.2f}]')
 
-    band = pts[(pts[:, 2] >= args.z_min) & (pts[:, 2] <= args.z_max)]
-    print(f'{len(band)} points in the [{args.z_min}, {args.z_max}] z-band used for the map')
+    if args.floor_z is not None:
+        floor_z = args.floor_z
+        print(f'Using --floor-z override: {floor_z:.2f}')
+    else:
+        # 3cm bins over the lower half of the cloud's own z range -- the
+        # floor is normally the single largest flat surface a lidar sees
+        # indoors, and restricting the search to the lower half avoids a
+        # large ceiling occasionally outscoring it.
+        lower_half = pts[pts[:, 2] <= z_lo + 0.5 * (z_hi - z_lo)]
+        bins = max(int((lower_half[:, 2].max() - lower_half[:, 2].min()) / 0.03), 1)
+        hist, edges = np.histogram(lower_half[:, 2], bins=bins)
+        peak = np.argmax(hist)
+        floor_mask = (lower_half[:, 2] >= edges[peak]) & (lower_half[:, 2] < edges[peak + 1])
+        floor_z = float(lower_half[floor_mask, 2].mean())
+        print(f'Auto-detected floor at z={floor_z:.2f} ({hist[peak]} points in that band, '
+              f'vs {len(lower_half)} points total in the lower half) -- override with --floor-z '
+              'if this looks wrong')
+
+    band = pts[(pts[:, 2] >= floor_z + args.z_min) & (pts[:, 2] <= floor_z + args.z_max)]
+    print(f'{len(band)} points in the [{args.z_min}, {args.z_max}] m-above-floor z-band used for the map')
     if len(band) == 0:
         raise SystemExit('No points survived the z-band filter -- check --z-min/--z-max '
                           'against the printed z range above.')

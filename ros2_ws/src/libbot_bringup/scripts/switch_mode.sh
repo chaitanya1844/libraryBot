@@ -35,7 +35,7 @@ MAP_PATH="${2:-$HOME/libraryBot/ros2_ws/src/libbot_fastlio/maps/library.yaml}"
 # map and switching back to localization kept showing the *old* one in
 # RViz's FastLioCloud display -- not a caching/display bug, a real
 # stale process serving genuinely stale data.
-STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|lidar_3d_livox_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|global_localization.py|pcd_to_pointcloud|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
+STOP_PATTERN="async_slam_toolbox_node|nav2_amcl|nav2_map_server|controller_server|planner_server|behavior_server|bt_navigator|waypoint_follower|smoother_server|lifecycle_manager|task_manager_node|fastlio_mapping|lidar_3d_livox_adapter|fastlio_map_odom_bridge|static_transform_publisher|mapping_preview_node|lidar_camera_colorizer|global_localization.py|pcd_to_pointcloud|mapping.launch.py|localization_fastlio.launch.py|autonomy.launch.py"
 
 # Just the Nav2 half, for relaunching navigation without tearing down
 # the localization stage underneath it (which owns map->odom and would
