@@ -101,6 +101,12 @@ def generate_launch_description():
         # style on top of that.
         SetEnvironmentVariable('QT_QPA_PLATFORMTHEME', 'qt5ct'),
         SetEnvironmentVariable('QT_STYLE_OVERRIDE', 'HighContrastInverse'),
+        # RViz's own panel buttons/text were reported hard to see/click at
+        # this screen's actual DPI -- QT_SCALE_FACTOR scales the whole Qt
+        # UI (fonts, buttons, spacing) uniformly, cheaper and more
+        # reliable than hunting down every hardcoded widget size in
+        # libbot_control_panel.cpp.
+        SetEnvironmentVariable('QT_SCALE_FACTOR', '1.3'),
 
         # `ros2 launch` sends SIGINT to each process it started, but
         # gzserver in particular has a long track record of surviving

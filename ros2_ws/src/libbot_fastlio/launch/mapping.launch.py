@@ -117,6 +117,18 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
         ),
 
+        # Trims FAST-LIO2's own /path (grows forever, no native RViz
+        # decay for Path displays) to its last N poses -- see
+        # path_trimmer_node.py. libbot_nav.rviz's FastLioPath display
+        # points at /path_trimmed, not /path, because of this.
+        Node(
+            package='libbot_perception',
+            executable='path_trimmer_node.py',
+            name='path_trimmer_node',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+
         SetRemap(src='/Laser_map', dst='/Laser_map_mapping'),
         IncludeLaunchDescription(
             PythonLaunchDescriptionSource(os.path.join(

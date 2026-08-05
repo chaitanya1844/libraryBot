@@ -16,6 +16,7 @@ install(PROGRAMS
   libbot_perception/lidar_3d_livox_adapter.py
   libbot_perception/lidar_3d_self_filter.py
   libbot_perception/lidar_camera_colorizer.py
+  libbot_perception/path_trimmer_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

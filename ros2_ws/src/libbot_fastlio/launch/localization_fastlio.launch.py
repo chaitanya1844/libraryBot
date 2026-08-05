@@ -125,6 +125,16 @@ def generate_launch_description():
             parameters=[{'use_sim_time': use_sim_time}],
         ),
 
+        # Same /path trimming as mapping.launch.py -- FAST-LIO2 still
+        # publishes /path during localization too.
+        Node(
+            package='libbot_perception',
+            executable='path_trimmer_node.py',
+            name='path_trimmer_node',
+            output='screen',
+            parameters=[{'use_sim_time': use_sim_time}],
+        ),
+
         # Static visualization of the actual PCD being localized against
         # (RViz's FastLioCloud display) -- with map_en off (see above)
         # there's otherwise nothing at all shown in 3D for "the map"
