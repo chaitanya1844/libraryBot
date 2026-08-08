@@ -1,0 +1,186 @@
+# libraryBot — full guide
+
+Everything that didn't fit in the top-level README: FAST-LIO2 internals,
+the control panel, full configuration reference, troubleshooting, and a
+manual testing cheatsheet. Start with the [README](../README.md) for
+setup and the basic commands.
+
+## What's simulated vs. simplified
+
+- **Drivetrain**: propulsion is `gazebo_ros_planar_move` (sets body
+  velocity directly), not wheel-ground friction -- mecanum roller
+  friction in Gazebo Classic's ODE was too solver-sensitive to reliably
+  convert wheel spin into chassis motion. Wheels still spin visually.
+- **Bundled map**: `libbot_fastlio/maps/library_new.yaml` (paired with
+  `pcd_maps/library_new.pcd`) covers the west half of the floor -- enough
+  to localize and send Nav2 goals immediately. Capture your own for the
+  rest (see Commands in the README); a good map has single-line walls, so
+  if yours shows the same wall drawn at several angles, something
+  upstream of FAST-LIO2 is feeding it inconsistent scans.
+
+## Repository layout
+
+```
+ros2_ws/src/
+├── libbot_description      URDF/xacro: chassis, mecanum wheels, side-mounted arm, 3D lidar, IMU, RealSense D435i, ros2_control
+├── libbot_gazebo            Library world (from aws-robomaker-bookstore-world), spawn launch, book/shelf props
+├── libbot_control           mecanum_drive_controller + arm_controller + joint_state_broadcaster (ros2_control) config/launch
+├── libbot_fastlio           EKF + FAST-LIO2 mapping/localization: PCD save, PCD->2D map converter, ICP relocalization against a saved map (vendored from HViktorTsoi/FAST_LIO_LOCALIZATION, see its README.fast_lio_localization.md), all config/launch
+├── libbot_navigation        Nav2 params (holonomic DWB tuning) + launch + RViz config
+├── libbot_perception        Lidar->2D scan, 3D-lidar-to-Livox-format adapter (for FAST-LIO2), self-hit filtering
+├── libbot_rviz_plugins      Native RViz2 panel (C++/Qt): the primary control surface, embedded in RViz
+└── libbot_bringup           Top-level launch files (simulation.launch.py, autonomy.launch.py, switch_mode.sh)
+```
+
+## 3D mapping/localization (FAST-LIO2)
+
+[FAST-LIO2](https://github.com/hku-mars/FAST_LIO/tree/ROS2) (tightly-
+coupled LiDAR-IMU odometry) is both the mapping source and Nav2's
+localization source -- chosen over AMCL+SLAM-Toolbox (redundant with a
+3D lidar already onboard) and over a full SLAM stack like rtabmap
+(heavier than this needs). `build.sh` sets up its overlay workspace
+automatically; see the README's "Build" section, or do it by hand:
+
+```bash
+mkdir -p ~/fastlio_ws/src && cd ~/fastlio_ws/src
+git clone https://github.com/Livox-SDK/Livox-SDK2.git
+git clone https://github.com/Livox-SDK/livox_ros_driver2.git
+git clone --recursive --branch ROS2 https://github.com/hku-mars/FAST_LIO.git
+# Livox-SDK2: cmake -DCMAKE_INSTALL_PREFIX=<prefix> .. && make install
+# livox_ros_driver2: cp package_ROS2.xml package.xml; cp -r launch_ROS2/ launch/
+#   (CMakeLists.txt hardcodes /usr/local for the SDK -- point find_library/
+#   find_path at <prefix> instead if installed elsewhere)
+cd ~/fastlio_ws && colcon build --cmake-args -DROS_EDITION=ROS2 -DDISTRO_ROS=humble
+```
+
+Notes if you touch this stack:
+- The simulated 3D lidar approximates a Livox Mid360: `libbot_description/
+  urdf/sensors/lidar_3d.urdf.xacro` publishes a raw `PointCloud2` from
+  Gazebo's `ray` sensor, and `libbot_perception/lidar_3d_livox_adapter.py`
+  repackages it as a `livox_ros_driver2/msg/CustomMsg` on `/livox/lidar`
+  (synthesizing the per-point `line`/`offset_time` fields FAST-LIO2 needs,
+  since Gazebo's `ray` sensor captures a whole cloud at one instant, no
+  real per-point time) -- the same message type/topic name a real
+  Mid360's driver publishes. The IMU is published on `/livox/imu` to
+  match.
+- `fast_lio_libbot.yaml` needs `publish.map_en: true` -- without it,
+  `/map_save` crashes the node with an unhandled PCL exception
+  ("Input point cloud has no data!") since nothing else ever populates
+  the point buffer it saves.
+- `fastlio_map_odom_bridge.py` turns FAST-LIO2's `/Odometry` (its own
+  `camera_init` frame) into the `map -> odom` transform Nav2 looks for.
+  While mapping (no prior map), it auto-aligns once at startup from the
+  current pose. While localizing (`use_external_localization:=true`), it
+  instead relays `/map_to_odom` from `fast_lio_localization` (a vendored
+  ROS2 port of HViktorTsoi/FAST_LIO_LOCALIZATION, `ros2_ws/src/libbot_fastlio`)
+  -- real coarse-to-fine ICP against the saved PCD, seeded by "2D Pose
+  Estimate", not a one-shot blind guess (that wasn't reliable: this run's
+  camera_init has no relationship to whatever old session's frame the
+  saved map was recorded in). Both paths compose through the fixed
+  `base_frame -> body_frame` offset (FAST-LIO2's "body" is physically the
+  IMU, not base_footprint -- conflating them was a real, previously-shipped
+  bug, a constant ~0.76m z bias easy to mistake for ordinary FAST-LIO2
+  drift) and constrain any correction to x/y/yaw, never z/roll/pitch
+  (unconstrained point-to-point ICP measured drifting a ground robot's
+  height by over a meter otherwise).
+- `mapping.launch.py` also runs `mapping_preview_node.py` (re-projects
+  the accumulating map cloud into a live 2D preview, since FAST-LIO2 has
+  no live 2D map the way slam_toolbox used to) and `fastlio_map_odom_bridge`
+  itself, so RViz has something to resolve while mapping, before any real
+  map exists.
+
+## Control panel
+
+"libraryBot Controls", a native RViz2 panel (`libbot_rviz_plugins`)
+docked in the RViz window `simulation.launch.py` opens. If missing:
+`Panels -> Add New Panel -> libbot_rviz_plugins -> LibbotControlPanel`.
+
+- **Status**: live pose.
+- **E-STOP**: toggle -- deactivates `mecanum_drive_controller` via
+  `/libbot/controller_manager/switch_controller` so nothing can move the
+  base regardless of who's publishing commands. Doesn't cancel an
+  in-flight Nav2 goal.
+- **Camera**: opens `rqt_image_view` in its own process/window (a second
+  RViz `Image` display GL context crashed rviz2 on this project's dev
+  GPU -- if yours handles multiple GL contexts fine, an RViz Image
+  display works too).
+- **Mode**: Map/Localize/Navigate buttons, see Commands in the README.
+- **Map dropdown**: pick a saved map, or "Save Map As..." to name one.
+
+### Xbox controller teleop
+
+Holonomic driving, deadman-switched (`libbot_control/config/xbox_holonomic.yaml`):
+
+| Input | Action |
+| --- | --- |
+| Hold LB | Deadman switch -- robot only moves while held |
+| Left stick | Forward/back, strafe left/right |
+| Right stick left/right | Rotate in place |
+| Hold LB + RB | Turbo speed |
+
+Publishes on `/libbot/mecanum_drive_controller/reference_unstamped`,
+same topic Nav2 and the panel use. If not detected: `ls /dev/input/js*`.
+
+## Configuration reference
+
+| What | File |
+| --- | --- |
+| Chassis/wheel dimensions, mass | `libbot_description/urdf/base/base.urdf.xacro` |
+| Mast height/radius | `libbot_description/urdf/base/payload_platform.urdf.xacro` |
+| Nav2 planning footprint radius | `libbot_navigation/config/nav2_params.yaml` (`robot_radius`) -- must stay >= chassis half-diagonal |
+| 3D lidar (Mid360-approximating) channels/rate/range | `libbot_description/urdf/sensors/lidar_3d.urdf.xacro` |
+| IMU noise | `libbot_description/urdf/sensors/imu.urdf.xacro` |
+| Depth camera resolution/rate/range | `libbot_description/urdf/sensors/depth_camera_gazebo.urdf.xacro` |
+| Mecanum kinematics | `libbot_control/config/controllers.yaml` (`kinematics.*`) |
+| Canonical velocity command topic | `/libbot/mecanum_drive_controller/reference_unstamped` |
+| Spawn location | `libbot_gazebo/launch/spawn_robot.launch.py` args `x`/`y`/`yaw` |
+| EKF sensor fusion weights | `libbot_fastlio/config/ekf.yaml` |
+| FAST-LIO2 tuning, map save path | `libbot_fastlio/config/fast_lio_libbot.yaml` |
+| Nav2: velocity/accel limits, critics, costmaps, BT | `libbot_navigation/config/nav2_params.yaml` |
+| Arm joint limits/mount, gripper | `libbot_description/urdf/arm/arm.urdf.xacro` |
+| Arm trajectory controller | `libbot_control/config/controllers.yaml` (`arm_controller`) |
+
+## Troubleshooting
+
+**"Failed to bring up all requested nodes"** -- usually
+`nav2_lifecycle_manager` losing a startup race under load, not a config
+error. Re-running the command is safe (`switch_mode.sh navigation` stops
+Nav2's own nodes first); check `free -h` if it keeps happening.
+
+If it happens *every* time rather than intermittently, check for a
+second Nav2 stack instead: `ps aux | grep controller_server` should
+show exactly one. Two lifecycle managers racing to manage the same node
+names fail this way permanently, not intermittently.
+
+**Robot stops responding after a lot of manual testing** -- check
+`free -h`; stray processes from repeated `ros2 launch` Ctrl-C's add up.
+Kill strays (see the README's Commands section) and relaunch.
+
+**Robot won't move, topics/services look fine** -- probably driven into
+a wall/furniture. Check `/libbot/model_states` for its actual pose.
+
+**RViz shows nothing while mapping** -- restart RViz fresh after any
+sim restart; a stale TF buffer from a prior `robot_state_publisher`
+instance is a known rviz2 quirk, not a config bug.
+
+**Duplicate processes fighting each other** (garbled joystick input,
+`TF_REPEATED_DATA` spam) -- multiple `ros2 launch` invocations left
+processes running simultaneously. `ps aux | grep <node_name>`, kill all
+but one instance.
+
+## Manual testing cheatsheet
+
+```bash
+# Drive the robot directly (bypasses Nav2)
+ros2 topic pub /libbot/mecanum_drive_controller/reference_unstamped geometry_msgs/msg/Twist \
+  "{linear: {x: 0.3, y: 0.0, z: 0.0}, angular: {x: 0.0, y: 0.0, z: 0.0}}" -r 20
+
+# Send a Nav2 goal from the CLI
+ros2 action send_goal /navigate_to_pose nav2_msgs/action/NavigateToPose \
+  "{pose: {header: {frame_id: 'map'}, pose: {position: {x: 1.3, y: 2.8}, orientation: {w: 1.0}}}}"
+
+# Move the arm directly
+ros2 action send_goal /libbot/arm_controller/follow_joint_trajectory control_msgs/action/FollowJointTrajectory \
+  "{trajectory: {joint_names: [shoulder_pan_joint, shoulder_lift_joint, elbow_joint, wrist_pitch_joint], \
+    points: [{positions: [0.3, -0.5, 0.8, 0.2], time_from_start: {sec: 2}}]}}"
+```

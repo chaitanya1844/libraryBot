@@ -5,7 +5,7 @@ Panels:
     Property Tree Widget:
       Expanded: ~
       Splitter Ratio: 0.5
-    Tree Height: 436
+    Tree Height: 610
   - Class: libbot_rviz_plugins/LibbotControlPanel
     Name: libraryBot Controls
 Visualization Manager:
@@ -368,30 +368,30 @@ Visualization Manager:
       Use Fixed Frame: true
       Use rainbow: true
       Value: false
-    - Alpha: 0.8500000238418579
+    - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 3.466024398803711
-        Min Value: -0.01573634147644043
+        Max Value: 3.4951581954956055
+        Min Value: -0.03345787525177002
         Value: true
       Axis: Z
-      Channel Name: intensity
+      Channel Name: y
       Class: rviz_default_plugins/PointCloud2
-      Color: 220; 90; 60
-      Color Transformer: AxisColor
+      Color: 170; 13; 42
+      Color Transformer: FlatColor
       Decay Time: 0
       Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 4096
+      Max Intensity: 12.506681442260742
       Min Color: 0; 0; 0
-      Min Intensity: 0
+      Min Intensity: -7.151991844177246
       Name: Lidar3D
       Position Transformer: XYZ
       Selectable: true
-      Size (Pixels): 3
-      Size (m): 0.019999999552965164
-      Style: Points
+      Size (Pixels): 4
+      Size (m): 0.05000000074505806
+      Style: Flat Squares
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -453,27 +453,27 @@ Visualization Manager:
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
-        Max Value: 10
-        Min Value: -10
+        Max Value: 3.589301109313965
+        Min Value: -0.07385823875665665
         Value: true
       Axis: Z
-      Channel Name: intensity
+      Channel Name: x
       Class: rviz_default_plugins/PointCloud2
       Color: 255; 255; 0
       Color Transformer: FlatColor
       Decay Time: 0
-      Enabled: false
+      Enabled: true
       Invert Rainbow: false
       Max Color: 255; 255; 255
-      Max Intensity: 4096
+      Max Intensity: 10.526203155517578
       Min Color: 0; 0; 0
-      Min Intensity: 0
+      Min Intensity: -3.9891791343688965
       Name: FastLioCloud
       Position Transformer: XYZ
       Selectable: true
       Size (Pixels): 3
       Size (m): 0.029999999329447746
-      Style: Points
+      Style: Flat Squares
       Topic:
         Depth: 5
         Durability Policy: Volatile
@@ -483,7 +483,7 @@ Visualization Manager:
         Value: /Laser_map
       Use Fixed Frame: true
       Use rainbow: true
-      Value: false
+      Value: true
     - Alpha: 1
       Autocompute Intensity Bounds: true
       Autocompute Value Bounds:
@@ -530,7 +530,7 @@ Visualization Manager:
       Color: 255; 255; 255
       Color Transformer: RGB8
       Decay Time: 0
-      Enabled: true
+      Enabled: false
       Invert Rainbow: false
       Max Color: 255; 255; 255
       Max Intensity: 4096
@@ -551,9 +551,9 @@ Visualization Manager:
         Value: /libbot/colored_map/points
       Use Fixed Frame: true
       Use rainbow: false
-      Value: true
+      Value: false
     - Alpha: 1
-      Buffer Length: 1
+      Buffer Length: 2
       Class: rviz_default_plugins/Path
       Color: 255; 0; 0
       Enabled: true
@@ -561,7 +561,7 @@ Visualization Manager:
       Head Length: 0.20000000298023224
       Length: 0.30000001192092896
       Line Style: Billboards
-      Line Width: 0.10000000149011612
+      Line Width: 0.029999999329447746
       Name: FastLioPath
       Offset:
         X: 0
@@ -715,37 +715,37 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz_default_plugins/Orbit
-      Distance: 21.114917755126953
+      Distance: 9.5
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 3.2496941089630127
-        Y: 0.5705136656761169
-        Z: 1.338449239730835
+        X: 3.2608096599578857
+        Y: -1.6239567995071411
+        Z: 0.01343849953263998
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.799796462059021
+      Pitch: 0.7947968244552612
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz_default_plugins)
-      Yaw: 3.104332208633423
+      Yaw: 4.399378299713135
     Saved: ~
 Window Geometry:
   CameraColor:
     collapsed: false
   Displays:
     collapsed: false
-  Height: 1009
+  Height: 1312
   Hide Left Dock: false
   Hide Right Dock: false
-  QMainWindow State: 000000ff00000000fd0000000200000000000001b00000037afc0200000002fb000000100044006900730070006c00610079007301000000560000020c000000dc01000007fb0000001600430061006d0065007200610043006f006c006f007201000002710000015f000000330100000700000001000001ed0000037afc0200000001fb00000026006c0069006200720061007200790042006f007400200043006f006e00740072006f006c007301000000560000037a0000005d01000007000003f60000037a00000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
-  Width: 1969
+  QMainWindow State: 000000ff00000000fd00000002000000000000023e000004a1fc0200000002fb000000100044006900730070006c006100790073010000005e000002bc000000d800fffffffb0000001600430061006d0065007200610043006f006c006f00720100000329000001d60000004300ffffff00000001000001ed000004a1fc0200000001fb00000026006c0069006200720061007200790042006f007400200043006f006e00740072006f006c0073010000005e000004a10000005500ffffff000005b7000004a100000004000000040000000800000008fc0000000100000002000000010000000a0054006f006f006c00730100000000ffffffff0000000000000000
+  Width: 2560
   X: 0
-  Y: 41
+  Y: 54
   libraryBot Controls:
     collapsed: false
