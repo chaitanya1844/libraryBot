@@ -45,8 +45,17 @@ source ~/libraryBot/ros2_ws/install/setup.bash
 Start the simulation (Gazebo + robot + RViz with the control panel):
 
 ```bash
-ros2 launch libbot_bringup simulation.launch.py headless:=false rviz:=true
+bash ~/libraryBot/ros2_ws/src/libbot_bringup/scripts/run_simulation.sh headless:=false rviz:=true
 ```
+
+Same arguments as `ros2 launch libbot_bringup simulation.launch.py`, just
+wrapped so **Ctrl-C actually tears the whole stack down** -- `ros2
+launch`'s own SIGINT handling never reliably reaches gzserver, and never
+reaches a mapping/localization/navigation stack started via
+`switch_mode.sh` at all (each is its own separate, detached `ros2
+launch`, not a child of this one). If you run the bare `ros2 launch
+libbot_bringup simulation.launch.py` command directly instead, run
+`switch_mode.sh stop` afterward to be sure everything's actually down.
 
 Switch modes (also available as buttons in the RViz control panel):
 
@@ -64,9 +73,11 @@ ros2 service call /map_save std_srvs/srv/Trigger
 ros2 run libbot_fastlio pcd_to_2d_map.py ~/libraryBot/ros2_ws/src/libbot_fastlio/pcd_maps/latest.pcd my_map_name
 ```
 
-Kill everything:
+If anything's still running after Ctrl-C (e.g. you killed the terminal
+instead of Ctrl-C-ing):
 
 ```bash
+bash ~/libraryBot/ros2_ws/src/libbot_bringup/scripts/switch_mode.sh stop
 pkill -9 -f "ros2 launch"; pkill -9 gzserver; pkill -9 gzclient; pkill -9 rviz2
 ```
 

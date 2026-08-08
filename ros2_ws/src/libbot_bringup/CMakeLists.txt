@@ -9,6 +9,7 @@ install(DIRECTORY launch
 
 install(PROGRAMS
   scripts/switch_mode.sh
+  scripts/run_simulation.sh
   DESTINATION lib/${PROJECT_NAME}
 )
 

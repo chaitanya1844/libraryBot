@@ -33,10 +33,9 @@ import os
 
 from ament_index_python.packages import get_package_share_directory
 from launch import LaunchDescription
-from launch.actions import (DeclareLaunchArgument, ExecuteProcess, IncludeLaunchDescription,
-                             RegisterEventHandler, SetEnvironmentVariable, TimerAction)
+from launch.actions import (DeclareLaunchArgument, IncludeLaunchDescription,
+                             SetEnvironmentVariable, TimerAction)
 from launch.conditions import IfCondition
-from launch.event_handlers import OnShutdown
 from launch.launch_description_sources import PythonLaunchDescriptionSource
 from launch.substitutions import LaunchConfiguration, PythonExpression
 from launch_ros.actions import Node
@@ -122,13 +121,26 @@ def generate_launch_description():
         # state to whatever connected next. That's the "starts from
         # saved data on next launch" symptom: it isn't loading saved
         # data at all, it's just reconnecting a fresh GUI to a gzserver
-        # that never actually stopped. Force-kill the whole process
-        # group by name on shutdown so the next `ros2 launch` always
-        # starts genuinely fresh, regardless of whether SIGINT alone
-        # was enough this time.
-        RegisterEventHandler(OnShutdown(on_shutdown=[
-            ExecuteProcess(cmd=['pkill', '-9', '-f', 'gzserver|gzclient|rviz2']),
-        ])),
+        # that never actually stopped. switch_mode.sh's mapping/
+        # localization/navigation stacks have the same problem *and*
+        # aren't even children of this launch (the panel/CLI starts each
+        # as its own separate, detached `ros2 launch`), so plain SIGINT
+        # here never reaches them either.
+        #
+        # This used to be "solved" with a RegisterEventHandler(OnShutdown(
+        # on_shutdown=[ExecuteProcess(...)])) here, force-pkilling both
+        # groups on shutdown. Verified (2026-08-08, isolated repro with a
+        # plain `touch` in on_shutdown) that `launch` does not actually
+        # run new processes from on_shutdown actions on this Humble
+        # version -- it never fired, so that handler was silent dead code
+        # the whole time and gzserver/the switch_mode stack always
+        # survived a real Ctrl-C. The actual fix is
+        # `scripts/run_simulation.sh`, a plain bash wrapper with its own
+        # `trap ... EXIT` around this same `ros2 launch` command -- see
+        # the README "Run" section. Prefer that entry point; plain
+        # `ros2 launch libbot_bringup simulation.launch.py` still works
+        # for driving the sim, it just needs a manual `switch_mode.sh
+        # stop` afterward if mapping/localization/navigation was running.
 
         # 1. Gazebo world
         _include('libbot_gazebo', 'gazebo.launch.py', {
